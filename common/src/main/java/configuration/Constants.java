@@ -3,6 +3,7 @@ package configuration;
 public class Constants {
     public static final int START_VALID_PORT = 1700;
     public static final int END_VALID_PORT = 1724;
+    public static int RTT = 2000; //Response Turnout time. The time (in milliseconds) host will be waiting for response.
 
     public enum REQUESTER {
         LOAD_BALANCER(0),
