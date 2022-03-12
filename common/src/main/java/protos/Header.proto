@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+option java_package = "models";
+option java_outer_classname = "Header";
+
+message Content {
+  int32 requester = 1;
+  int32 type = 2;
+  int32 seqNum = 3;
+}
