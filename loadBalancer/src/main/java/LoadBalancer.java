@@ -45,8 +45,8 @@ public class LoadBalancer {
                 logger.info(String.format("[%s:%d] Received the connection from the host %s:%d.", config.getAddress(), config.getPort(), socket.getInetAddress().getHostAddress(), socket.getPort()));
                 Connection connection = new Connection(socket, socket.getInetAddress().getHostAddress(), socket.getPort(), config.getAddress(), config.getPort());
                 if (connection.openConnection()) {
-                    RequestHandler requestHandler = new RequestHandler();
-                    threadPool.execute(() -> requestHandler.process(connection));
+                    RequestHandler requestHandler = new RequestHandler(connection);
+                    threadPool.execute(requestHandler::process);
                 }
             } catch (IOException exception) {
                 logger.error(String.format("[%s:%d] Fail to accept the connection from another host. ", config.getAddress(), config.getPort()), exception);

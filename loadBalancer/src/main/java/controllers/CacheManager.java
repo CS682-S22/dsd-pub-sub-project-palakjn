@@ -61,4 +61,8 @@ public class CacheManager {
     public static Partition getPartition(String name, int partition) {
         return partitionMap.getOrDefault(String.format("%s_%s", name, partition), null);
     }
+
+    public static boolean isPartitionExist(String name, int partition) {
+        return partitionMap.containsKey(String.format("%s_%s", name, partition));
+    }
 }

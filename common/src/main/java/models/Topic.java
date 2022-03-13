@@ -1,5 +1,7 @@
 package models;
 
+import utilities.Strings;
+
 import java.util.List;
 
 public class Topic extends Object {
@@ -26,5 +28,9 @@ public class Topic extends Object {
     public void addPartition(Partition partition) {
         this.partitions.add(partition);
         this.numOfPartitions++;
+    }
+
+    public boolean isValid() {
+        return !Strings.isNullOrEmpty(name);
     }
 }

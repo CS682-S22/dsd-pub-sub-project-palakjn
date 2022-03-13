@@ -1,6 +1,6 @@
 package models;
 
-public class Partition {
+public class Partition extends Object {
     private String topicName;
     private int number;
     private Host broker;

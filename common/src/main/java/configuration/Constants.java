@@ -25,13 +25,14 @@ public class Constants {
 
     public enum TYPE {
         SYN(0),
-        RESP(1), //Response
-        ACK(2),  //Acknowledgment
-        NACK(3), //Negative Acknowledgement
-        DATA(4),
-        PULL(5),
-        ADD(6),  //Join or Subscribe
-        REM(7);  //Remove
+        REQ(1),  //Request
+        RESP(2), //Response
+        ACK(3),  //Acknowledgment
+        NACK(4), //Negative Acknowledgement
+        DATA(5),
+        PULL(6),
+        ADD(7),  //Join or Subscribe
+        REM(8);  //Remove
 
         private final int value;
         TYPE(int value) {
@@ -41,5 +42,32 @@ public class Constants {
         public int getValue() {
             return value;
         }
+    }
+
+    public enum REQUEST {
+        TOPIC(0),
+        PARTITION(1);
+
+        private final int value;
+        REQUEST(int value) {
+            this.value = value;
+        }
+
+        public int getValue() {
+            return value;
+        }
+    }
+
+    public static REQUEST findRequestByValue(int value) {
+        REQUEST result = null;
+
+        for (REQUEST type : REQUEST.values()) {
+            if (type.getValue() == value) {
+                result = type;
+                break;
+            }
+        }
+
+        return result;
     }
 }
