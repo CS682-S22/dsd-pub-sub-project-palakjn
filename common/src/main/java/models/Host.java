@@ -3,7 +3,7 @@ package models;
 import configuration.Constants;
 import utilities.Strings;
 
-public class Host extends Object{
+public class Host extends Object {
     private String address;
     private int port;
 
