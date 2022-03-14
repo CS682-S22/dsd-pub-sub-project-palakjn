@@ -3,6 +3,7 @@ package utilities;
 import com.google.protobuf.InvalidProtocolBufferException;
 import configuration.Constants;
 import models.Header;
+import models.Object;
 
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
@@ -34,6 +35,22 @@ public class PacketHandler {
      */
     public static byte[] createHeader(Constants.REQUESTER requester, Constants.TYPE type) {
         return Header.Content.newBuilder().setRequester(requester.getValue()).setType(type.getValue()).build().toByteArray();
+    }
+
+    /**
+     * Create the entire packet: header + body
+     * @return byte array
+     */
+    public static byte[] createPacket(Constants.REQUESTER requester, Constants.TYPE type, Object object) {
+        byte[] packet = null;
+        byte[] body = object.toByte();
+
+        if (body != null) {
+            byte[] header = createHeader(requester, type);
+            packet = ByteBuffer.allocate(4 + header.length + body.length).putInt(header.length).put(header).put(body).array();
+        }
+
+        return packet;
     }
 
     /**

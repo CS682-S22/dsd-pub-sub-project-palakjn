@@ -12,7 +12,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class LoadBalancer {
-    private static final Logger logger = (Logger) LogManager.getLogger(LoadBalancer.class);
+    private static final Logger logger = LogManager.getLogger(LoadBalancer.class);
     private ExecutorService threadPool;
     Config config;
     private boolean running = true;

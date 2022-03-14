@@ -66,6 +66,13 @@ public class Connection implements Sender, Receiver {
     }
 
     /**
+     * @return the source host address
+     */
+    public String getSourceIPAddress() {
+        return sourceIPAddress;
+    }
+
+    /**
      * @return the source port
      */
     public int getSourcePort() {

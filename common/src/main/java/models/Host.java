@@ -6,6 +6,7 @@ import utilities.Strings;
 public class Host extends Object {
     private String address;
     private int port;
+    private int numberOfPartitions; // Number of partitions a corresponding broker holding. [Will be 0 for other type of hosts: producer/consumer/load balancer]
 
     public Host(String address, int port) {
         this.address = address;
@@ -18,6 +19,14 @@ public class Host extends Object {
 
     public int getPort() {
         return port;
+    }
+
+    public int getNumberOfPartitions() {
+        return numberOfPartitions;
+    }
+
+    public void incrementNumOfPartitions() {
+        this.numberOfPartitions++;
     }
 
     public boolean isValid() {
