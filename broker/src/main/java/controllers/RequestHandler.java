@@ -19,17 +19,36 @@ public class RequestHandler {
     }
 
     public void process() {
-        byte[] request = connection.receive();
+        boolean running = true;
+        int curSeq = 0;
 
-        if (request != null) {
-            Header.Content header = BrokerPacketHandler.getHeader(request);
+        while (running) {
+            byte[] request = connection.receive();
 
-            if (header.getRequester() == BrokerConstants.REQUESTER.LOAD_BALANCER.getValue()) {
+            if (request != null) {
+                Header.Content header = BrokerPacketHandler.getHeader(request);
 
-            } else if (header.getRequester() == BrokerConstants.REQUESTER.PRODUCER.getValue()) {
+                if (header.getRequester() == BrokerConstants.REQUESTER.LOAD_BALANCER.getValue()) {
+                    if (header.getSeqNum() == curSeq) {
+                        LBHandler lbHandler = new LBHandler(connection);
+                        boolean isSuccess = lbHandler.processRequest(header, request);
 
-            } else if (header.getRequester() == BrokerConstants.REQUESTER.CONSUMER.getValue()) {
+                        if (isSuccess) {
+                            hostService.sendACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                            curSeq = curSeq == 0 ? 1 : 0;
+                        } else {
+                            hostService.sendNACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                        }
+                    } else if ((curSeq == 0 && header.getSeqNum() == 1) || (curSeq == 1 && header.getSeqNum() == 0)) {
+                        hostService.sendACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                    }
+                } else if (header.getRequester() == BrokerConstants.REQUESTER.PRODUCER.getValue()) {
 
+                } else if (header.getRequester() == BrokerConstants.REQUESTER.CONSUMER.getValue()) {
+
+                }
+            } else {
+                running = false;
             }
         }
     }

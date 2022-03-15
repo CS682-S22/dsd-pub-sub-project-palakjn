@@ -47,7 +47,6 @@ public class RequestHandler {
                         header.getType() == Constants.TYPE.REQ.getValue()) {
                     logger.info(String.format("[%s:%d] Received request from %s to get broker details for a partition/topic.", connection.getDestinationIPAddress(), connection.getDestinationPort(), Constants.REQUESTER.values()[header.getRequester()].name()));
                     sendBrokerDetails(request);
-                    running = false;
                 } else if (header.getRequester() == Constants.REQUESTER.TOPIC.getValue()) {
                     if (header.getSeqNum() == curSeq) {
                         logger.info(String.format("[%s:%d] Received request from host with sequence number: %d to create the topic", connection.getDestinationIPAddress(), connection.getDestinationPort(), curSeq));
