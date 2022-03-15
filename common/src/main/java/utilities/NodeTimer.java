@@ -18,7 +18,7 @@ public class NodeTimer {
      * Start the timer
      * @param packet the sequence number/packet type for which we have started the timer for
      */
-    public void startTimer(String packet) {
+    public void startTimer(String packet, long delay) {
         timer = new Timer();
         TimerTask task = new TimerTask() {
             public void run() {
@@ -28,7 +28,7 @@ public class NodeTimer {
                 this.cancel();
             }
         };
-        timer.schedule(task, Constants.RTT);
+        timer.schedule(task, delay);
     }
 
     /**

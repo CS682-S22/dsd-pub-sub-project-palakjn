@@ -1,6 +1,6 @@
 package controllers;
 
-import configuration.Constants;
+import configurations.BrokerConstants;
 import models.Header;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -24,11 +24,11 @@ public class RequestHandler {
         if (request != null) {
             Header.Content header = BrokerPacketHandler.getHeader(request);
 
-            if (header.getRequester() == Constants.REQUESTER.LOAD_BALANCER.getValue()) {
+            if (header.getRequester() == BrokerConstants.REQUESTER.LOAD_BALANCER.getValue()) {
 
-            } else if (header.getRequester() == Constants.REQUESTER.PRODUCER.getValue()) {
+            } else if (header.getRequester() == BrokerConstants.REQUESTER.PRODUCER.getValue()) {
 
-            } else if (header.getRequester() == Constants.REQUESTER.CONSUMER.getValue()) {
+            } else if (header.getRequester() == BrokerConstants.REQUESTER.CONSUMER.getValue()) {
 
             }
         }

@@ -1,6 +1,6 @@
 package controllers;
 
-import configuration.Constants;
+import configurations.BrokerConstants;
 import models.Header;
 import models.Host;
 import org.apache.log4j.LogManager;
@@ -14,21 +14,21 @@ public class LBHandler {
     private static final Logger logger = LogManager.getLogger(LBHandler.class);
 
     public boolean join(Host brokerInfo, Host loadBalancerInfo) {
-        return send(brokerInfo, loadBalancerInfo, Constants.TYPE.ADD);
+        return send(brokerInfo, loadBalancerInfo, BrokerConstants.TYPE.ADD);
     }
 
     public boolean remove(Host brokerInfo, Host loadBalancerInfo) {
-        return send(brokerInfo, loadBalancerInfo, Constants.TYPE.REM);
+        return send(brokerInfo, loadBalancerInfo, BrokerConstants.TYPE.REM);
     }
 
     public void processRequest(Header.Content header, byte[] request) {
-        if (header.getType() == Constants.TYPE.ADD.getValue()) {
+        if (header.getType() == BrokerConstants.TYPE.ADD.getValue()) {
             //Adding new topic information
 
         }
     }
 
-    private boolean send(Host brokerInfo, Host loadBalancerInfo, Constants.TYPE type) {
+    private boolean send(Host brokerInfo, Host loadBalancerInfo, BrokerConstants.TYPE type) {
         boolean isSuccess = false;
 
         try {
@@ -39,7 +39,7 @@ public class LBHandler {
             if (connection.openConnection()) {
                 HostService service = new HostService(connection, logger);
                 byte[] packet = BrokerPacketHandler.createPacket(brokerInfo, type);
-                isSuccess = service.sendPacketWithACK(packet, String.format("%s:%s", Constants.REQUESTER.BROKER.name(), type.name()));
+                isSuccess = service.sendPacketWithACK(packet, String.format("%s:%s", BrokerConstants.REQUESTER.BROKER.name(), type.name()));
             }
         } catch (IOException exception) {
             logger.error(String.format("[%s:%d] Fail to make connection with the load balancer %s:%d. ", brokerInfo.getAddress(), brokerInfo.getPort(), loadBalancerInfo.getAddress(), loadBalancerInfo.getPort()), exception);

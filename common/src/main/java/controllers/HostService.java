@@ -36,13 +36,13 @@ public class HostService {
         boolean running = true;
 
         connection.send(packet);
-        timer.startTimer(packetName);
+        timer.startTimer(packetName, Constants.RTT);
 
         while (running) {
             if (timer.isTimeout()) {
                 logger.warn(String.format("[%s:%d] Time-out happen for the packet %s to the host %s:%d. Re-sending the packet.", connection.getSourceIPAddress(), connection.getSourcePort(), packetName, connection.getDestinationIPAddress(), connection.getDestinationPort()));
                 connection.send(packet);
-                timer.startTimer(packetName);
+                timer.startTimer(packetName, Constants.RTT);
             } else if (connection.isAvailable()) {
                 byte[] responseBytes = connection.receive();
 
