@@ -32,4 +32,9 @@ public class Host extends Object {
     public boolean isValid() {
         return !(Strings.isNullOrEmpty(address) || port < Constants.START_VALID_PORT || port > Constants.END_VALID_PORT);
     }
+
+    public String getString() {
+        return String.format("%s:%d", address, port);
+    }
+
 }

@@ -1,6 +1,7 @@
 package controllers;
 
 import configuration.Constants;
+import models.Header;
 import models.Host;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -10,7 +11,7 @@ import java.io.IOException;
 import java.net.Socket;
 
 public class LBHandler {
-    private static final Logger logger = (Logger) LogManager.getLogger(LBHandler.class);
+    private static final Logger logger = LogManager.getLogger(LBHandler.class);
 
     public boolean join(Host brokerInfo, Host loadBalancerInfo) {
         return send(brokerInfo, loadBalancerInfo, Constants.TYPE.ADD);
@@ -18,6 +19,13 @@ public class LBHandler {
 
     public boolean remove(Host brokerInfo, Host loadBalancerInfo) {
         return send(brokerInfo, loadBalancerInfo, Constants.TYPE.REM);
+    }
+
+    public void processRequest(Header.Content header, byte[] request) {
+        if (header.getType() == Constants.TYPE.ADD.getValue()) {
+            //Adding new topic information
+
+        }
     }
 
     private boolean send(Host brokerInfo, Host loadBalancerInfo, Constants.TYPE type) {

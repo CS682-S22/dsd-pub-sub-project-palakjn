@@ -9,6 +9,8 @@ import utilities.LBPacketHandler;
 
 import java.io.IOException;
 import java.net.Socket;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -159,7 +161,7 @@ public class RequestHandler {
                             logger.debug(String.format("[%s:%d] Created topic %s with %d number of partitions. Sending the information to the respective brokers.",connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getNumOfPartitions()));
 
                             //Send partition information to all the brokers asynchronously. Assuming that all the brokers might be up and running
-                            send(topic);
+                            sendToBrokers(topic);
                         } else {
                             //Two requests for creating topic with same name might have received. Another thread might have added that topic before.
                             logger.warn(String.format("[%s:%d] Another instance might have created same topic. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort()));
@@ -177,30 +179,34 @@ public class RequestHandler {
         }
     }
 
-    private void send(Topic topic) {
-        //Create threads equal to the number of partitions.
-        ExecutorService threadPool = Executors.newFixedThreadPool(topic.getNumOfPartitions());
+    private void sendToBrokers(Topic topic) {
+        HashMap<String, Topic> partitionsPerBroker = topic.groupBy();
 
-        for (Partition partition : topic.getPartitions()) {
+        //Create threads equal to the number of r.
+        ExecutorService threadPool = Executors.newFixedThreadPool(partitionsPerBroker.size());
+
+        for (Map.Entry<String, Topic> entry : partitionsPerBroker.entrySet()) {
             //Per partition, assign a thread to send the partition information to the broker
-            threadPool.execute(() -> send(partition));
+            threadPool.execute(() -> sendToBroker(entry.getValue()));
         }
 
         threadPool.shutdown();
     }
 
-    private void send(Partition partition) {
+    private void sendToBroker(Topic topic) {
         try {
-            Socket socket = new Socket(partition.getBroker().getAddress(), partition.getBroker().getPort());
-            Connection connection = new Connection(socket, partition.getBroker().getAddress(), partition.getBroker().getPort(), this.connection.getSourceIPAddress(), this.connection.getSourcePort());
+            Host brokerInfo = topic.getPartitions().get(0).getBroker();
+            Socket socket = new Socket(brokerInfo.getAddress(), brokerInfo.getPort());
+            Connection connection = new Connection(socket, brokerInfo.getAddress(), brokerInfo.getPort(), this.connection.getSourceIPAddress(), this.connection.getSourcePort());
             if (connection.openConnection()) {
-                logger.debug(String.format("[%s:%d] Sending the the topic %s - Partition %d information to the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
-                byte[] packet = LBPacketHandler.createPacket(Constants.TYPE.ADD, partition);
+                logger.debug(String.format("[%s:%d] Sending the the topic %s - Partitions {%s} information to the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getPartitionString()));
+                byte[] packet = LBPacketHandler.createPacket(Constants.TYPE.ADD, topic);
                 hostService.sendPacketWithACK(packet, String.format("%s:%s", Constants.REQUESTER.LOAD_BALANCER.name(), Constants.TYPE.ADD.name()));
-                logger.info(String.format("[%s:%d] Send the topic %s - Partition %d information to the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
+                //TODO: If isSuccess == false then, remove the topic information from the cache
+                logger.info(String.format("[%s:%d] Send the topic %s - Partitions {%s} information to the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getPartitionString()));
             }
         } catch (IOException exception) {
-            logger.error(String.format("[%s:%d] Fail to make connection with the broker in order to send the topic %s - Partition %d information", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()), exception);
+            logger.error(String.format("[%s:%d] Fail to make connection with the broker in order to send the topic %s - Partitions {%s} information", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getPartitionString()), exception);
         }
     }
 

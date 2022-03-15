@@ -42,7 +42,7 @@ public class LoadBalancer {
         while (running) {
             try {
                 Socket socket = serverSocket.accept();
-                logger.info(String.format("[%s:%d] Received the connection from the host %s:%d.", config.getAddress(), config.getPort(), socket.getInetAddress().getHostAddress(), socket.getPort()));
+                logger.info(String.format("[%s:%d] Received the connection from the host.", socket.getInetAddress().getHostAddress(), socket.getPort()));
                 Connection connection = new Connection(socket, socket.getInetAddress().getHostAddress(), socket.getPort(), config.getAddress(), config.getPort());
                 if (connection.openConnection()) {
                     RequestHandler requestHandler = new RequestHandler(connection);

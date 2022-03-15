@@ -22,4 +22,8 @@ public class Partition extends Object {
     public Host getBroker() {
         return broker;
     }
+
+    public String getString() {
+        return String.format("%s:%d", topicName, number);
+    }
 }

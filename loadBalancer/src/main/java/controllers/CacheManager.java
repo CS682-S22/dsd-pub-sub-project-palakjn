@@ -83,7 +83,7 @@ public class CacheManager {
                 topicMap.put(topic.getName(), topic);
 
                 for (Partition partition : topic.getPartitions()) {
-                    partitionMap.put(String.format("%s_%s", partition.getTopicName(), partition.getNumber()), partition);
+                    partitionMap.put(partition.getString(), partition);
                 }
 
                 flag = true;
@@ -101,13 +101,13 @@ public class CacheManager {
 
     public static Partition getPartition(String name, int partition) {
         synchronized (topicLock) {
-            return partitionMap.getOrDefault(String.format("%s_%s", name, partition), null);
+            return partitionMap.getOrDefault(String.format("%s:%s", name, partition), null);
         }
     }
 
     public static boolean isPartitionExist(String name, int partition) {
         synchronized (topicLock) {
-            return partitionMap.containsKey(String.format("%s_%s", name, partition));
+            return partitionMap.containsKey(String.format("%s:%s", name, partition));
         }
     }
 }
