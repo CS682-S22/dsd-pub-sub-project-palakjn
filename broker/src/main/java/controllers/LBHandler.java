@@ -35,31 +35,45 @@ public class LBHandler {
 
         if (header.getType() == BrokerConstants.TYPE.ADD.getValue()) {
             //Adding new topic information
-
             byte[] body = BrokerPacketHandler.getData(request);
-            Topic topic = JSONDesrializer.fromJson(body, Topic.class);
 
-            if (topic != null && topic.isValid()) {
-                logger.info(String.format("Received request to handle %d number of partitions for a topic %s.", topic.getNumOfPartitions(), topic.getName()));
+            if (body != null) {
+                Topic topic = JSONDesrializer.fromJson(body, Topic.class);
 
-                //First checking if topic already exits
-                if (CacheManager.iSTopicExist(topic.getName())) {
-                    logger.warn(String.format("[%s:%d] Broker already handling the topic %s. Will send NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
-                } else if (topic.getNumOfPartitions() > 0) {
-                    CacheManager.addTopic(topic.getName());
+                if (topic != null && topic.isValid()) {
+                    logger.info(String.format("Received request to handle %d number of partitions for a topic %s.", topic.getNumOfPartitions(), topic.getName()));
 
-                    for (Partition partition : topic.getPartitions()) {
-                        File file = new File();
-                        file.initialize(String.format(BrokerConstants.TOPIC_LOCATION, connection.getSourceIPAddress(), connection.getSourcePort()), partition.getTopicName(), partition.getNumber());
-                        CacheManager.addPartition(partition.getTopicName(), partition.getNumber(), file);
-                        logger.info(String.format("[%s:%d] Added topic %s - partition %d information to the local cache.", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
+                    //First checking if topic already exits
+                    if (CacheManager.iSTopicExist(topic.getName())) {
+                        logger.warn(String.format("[%s:%d] Broker already handling the topic %s. Will send NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
+                        hostService.sendNACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                    } else if (topic.getNumOfPartitions() > 0) {
+                        CacheManager.addTopic(topic.getName());
+
+                        for (Partition partition : topic.getPartitions()) {
+                            File file = new File();
+                            file.initialize(String.format(BrokerConstants.TOPIC_LOCATION, connection.getSourceIPAddress(), connection.getSourcePort()), partition.getTopicName(), partition.getNumber());
+                            CacheManager.addPartition(partition.getTopicName(), partition.getNumber(), file);
+                            logger.info(String.format("[%s:%d] Added topic %s - partition %d information to the local cache.", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
+                        }
+
+                        hostService.sendACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                        isSuccess = true;
+                    } else {
+                        logger.warn(String.format("[%s:%d] Received no partitions for the topic %s from the load balancer. Will send NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
+                        hostService.sendNACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                     }
-
-                    isSuccess = true;
                 } else {
-                    logger.warn(String.format("[%s:%d] Received no partitions for the topic %s from the load balancer. Will send NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
+                    logger.warn(String.format("[%s:%d] Received invalid topic information from the load balancer. Will send NACK", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                    hostService.sendNACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                 }
+            } else {
+                logger.warn(String.format("[%s:%d] Received empty request body from the producer. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                hostService.sendNACK(Constants.REQUESTER.BROKER, header.getSeqNum());
             }
+        } else {
+            logger.warn(String.format("[%s:%d] Received unsupported action %d from the load balancer. Will send NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getType()));
+            hostService.sendNACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
         }
 
         return isSuccess;

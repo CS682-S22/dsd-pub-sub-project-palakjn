@@ -4,7 +4,7 @@ import configuration.Constants;
 import utilities.Strings;
 
 public class Request extends Object {
-    private int type;
+    private int type; //Topic or Partition
     private String topicName;
     private int partition;
 

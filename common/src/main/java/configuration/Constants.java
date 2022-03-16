@@ -32,7 +32,8 @@ public class Constants {
         DATA(5),
         PULL(6),
         ADD(7),  //Join or Subscribe
-        REM(8);  //Remove
+        REM(8),  //Remove
+        FIN(9);
 
         private final int value;
         TYPE(int value) {
