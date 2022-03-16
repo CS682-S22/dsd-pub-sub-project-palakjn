@@ -2,7 +2,7 @@ package controllers;
 
 import configuration.Constants;
 import models.Header;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.Logger;
 import utilities.NodeTimer;
 import utilities.PacketHandler;
 
@@ -16,17 +16,17 @@ public class HostService {
     }
 
     public void sendACK(Constants.REQUESTER requester, int seqNum) {
-        byte[] acknowledgement = PacketHandler.createHeader(requester, Constants.TYPE.ACK, seqNum);
+        byte[] acknowledgement = PacketHandler.createACK(requester, seqNum);
         connection.send(acknowledgement);
     }
 
     public void sendNACK(Constants.REQUESTER requester, int seqNum) {
-        byte[] negAck = PacketHandler.createHeader(requester, Constants.TYPE.NACK, seqNum);
+        byte[] negAck = PacketHandler.createNACK(requester, seqNum);
         connection.send(negAck);
     }
 
     public void sendNACK(Constants.REQUESTER requester) {
-        byte[] negAck = PacketHandler.createHeader(requester, Constants.TYPE.NACK);
+        byte[] negAck = PacketHandler.createNACK(requester);
         connection.send(negAck);
     }
 

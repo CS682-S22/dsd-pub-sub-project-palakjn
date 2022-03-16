@@ -5,8 +5,8 @@ import configurations.BrokerConstants;
 import models.File;
 import models.Header;
 import models.Request;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import utilities.BrokerPacketHandler;
 import utilities.JSONDesrializer;
 

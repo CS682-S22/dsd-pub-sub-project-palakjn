@@ -12,18 +12,15 @@ import java.util.*;
  * @author Palak Jain
  */
 public class CacheManager {
-    private static List<Host> brokers;
-    private static Map<String, Topic> topicMap;            // Map topic name to the topic object. Useful when a customer need to read from all the partitions of a topic
-    private static Map<String, Partition> partitionMap;    // Map topic name + partition to the partition object. Useful when a customer wants to read from particular topic partition as well as when the producer wants to publish message
+    private static List<Host> brokers = new ArrayList<>();
+    private static Map<String, Topic> topicMap = new HashMap<>();            // Map topic name to the topic object. Useful when a customer need to read from all the partitions of a topic
+    private static Map<String, Partition> partitionMap = new HashMap<>();    // Map topic name + partition to the partition object. Useful when a customer wants to read from particular topic partition as well as when the producer wants to publish message
 
     //locks
     private static final Object brokerLock = new Object();
     private static final Object topicLock = new Object();
 
     private CacheManager() {
-        brokers = new ArrayList<>();
-        topicMap = new HashMap<>();
-        partitionMap = new HashMap<>();
     }
 
     public static boolean isExist(Host broker) {

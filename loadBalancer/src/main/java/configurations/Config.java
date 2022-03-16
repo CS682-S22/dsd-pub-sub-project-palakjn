@@ -20,4 +20,8 @@ public class Config {
     public int getPort() {
         return port;
     }
+
+    public boolean isValid() {
+        return !Strings.isNullOrEmpty(address) && port >= Constants.START_VALID_PORT && port <= Constants.END_VALID_PORT;
+    }
 }

@@ -11,7 +11,7 @@ public class Segment {
     private byte[] buffer;
     private List<Long> offsets;
     private String location;
-    private long size;
+    private int numOfLogs;
     private FileManager fileManager;
 
     public Segment(String parentLocation, int segment) {
@@ -40,7 +40,7 @@ public class Segment {
             buffer = ByteBuffer.allocate(buffer.length + data.length).put(buffer).put(data).array();
         }
 
-        size += data.length;
+        numOfLogs++;
     }
 
     public boolean flush() {
@@ -52,7 +52,7 @@ public class Segment {
         return isSuccess;
     }
 
-    public long getSize() {
-        return size;
-    }
+   public int getNumOfLogs() {
+        return numOfLogs;
+   }
 }

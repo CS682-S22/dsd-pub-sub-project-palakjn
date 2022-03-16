@@ -3,8 +3,8 @@ package controllers;
 import configuration.Constants;
 import configurations.BrokerConstants;
 import models.*;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import utilities.BrokerPacketHandler;
 import utilities.JSONDesrializer;
 
@@ -91,6 +91,9 @@ public class LBHandler {
                 HostService service = new HostService(connection, logger);
                 byte[] packet = BrokerPacketHandler.createPacket(brokerInfo, type);
                 isSuccess = service.sendPacketWithACK(packet, String.format("%s:%s", BrokerConstants.REQUESTER.BROKER.name(), type.name()));
+                if (isSuccess) {
+                    logger.info("Successfully joined to the network");
+                }
             }
         } catch (IOException exception) {
             logger.error(String.format("[%s:%d] Fail to make connection with the load balancer %s:%d. ", brokerInfo.getAddress(), brokerInfo.getPort(), loadBalancerInfo.getAddress(), loadBalancerInfo.getPort()), exception);

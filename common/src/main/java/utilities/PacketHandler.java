@@ -38,6 +38,41 @@ public class PacketHandler {
     }
 
     /**
+     * Creates an acknowledgement packet for the file chunk with the given sequence number
+     * @param requester the type of the requester: BROKER, LOADBALANCER, etc
+     * @param seqNum Sequence number of the file whose acknowledgement we are sending
+     * @return the packet
+     */
+    public static byte[] createACK(Constants.REQUESTER requester, int seqNum) {
+        byte[] header = createHeader(requester, Constants.TYPE.ACK, seqNum);
+
+        return ByteBuffer.allocate(4 + header.length).putInt(header.length).put(header).array();
+    }
+
+    /**
+     * Creates negative acknowledgement packet for the file chunk with the given sequence number
+     * @param requester the type of the requester: BROKER, LOADBALANCER, etc
+     * @param seqNum Sequence number of the file whose acknowledgement we are sending
+     * @return the packet
+     */
+    public static byte[] createNACK(Constants.REQUESTER requester, int seqNum) {
+        byte[] header = createHeader(requester, Constants.TYPE.NACK, seqNum);
+
+        return ByteBuffer.allocate(4 + header.length).putInt(header.length).put(header).array();
+    }
+
+    /**
+     * Creates negative acknowledgement packet for the file chunk
+     * @param requester the type of the requester: BROKER, LOADBALANCER, etc
+     * @return the packet
+     */
+    public static byte[] createNACK(Constants.REQUESTER requester) {
+        byte[] header = createHeader(requester, Constants.TYPE.NACK);
+
+        return ByteBuffer.allocate(4 + header.length).putInt(header.length).put(header).array();
+    }
+
+    /**
      * Create the entire packet: header + body
      * @return byte array
      */

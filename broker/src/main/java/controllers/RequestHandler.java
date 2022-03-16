@@ -2,8 +2,8 @@ package controllers;
 
 import configurations.BrokerConstants;
 import models.Header;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import utilities.BrokerPacketHandler;
 
 public class RequestHandler {

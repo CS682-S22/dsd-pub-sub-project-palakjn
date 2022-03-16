@@ -8,12 +8,10 @@ import java.util.List;
 import java.util.Map;
 
 public class CacheManager {
-    private static Map<String, File> partitions;
-    private static List<String> topics;
+    private static Map<String, File> partitions = new HashMap<>();
+    private static List<String> topics = new ArrayList<>();
 
     private CacheManager() {
-        partitions = new HashMap<>();
-        topics = new ArrayList<>();
     }
 
     public static void addTopic(String topic) {

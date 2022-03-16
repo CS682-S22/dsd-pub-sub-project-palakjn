@@ -2,8 +2,8 @@ package controllers;
 
 import configuration.Constants;
 import models.*;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import utilities.JSONDesrializer;
 import utilities.LBPacketHandler;
 
@@ -66,13 +66,14 @@ public class RequestHandler {
         byte[] body = LBPacketHandler.getData(message);
 
         if (body != null) {
-            Host broker = JSONDesrializer.fromJson(message, Host.class);
+            Host broker = JSONDesrializer.fromJson(body, Host.class);
 
             if (broker != null && broker.isValid()) {
                 if (action == Constants.TYPE.ADD.getValue()) {
                     logger.warn(String.format("[%s:%d] Received JOIN request from the broker. Adding the broker to the collection.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
                     CacheManager.addBroker(broker);
                     sendAck();
+                    logger.info(String.format("[%s:%d] Added the broker to the collection.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
                 } else if (action == Constants.TYPE.REM.getValue()) {
                     logger.warn(String.format("[%s:%d] Received REMOVE request from the broker. Removing the broker from the collection.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
                     CacheManager.removeBroker(broker);

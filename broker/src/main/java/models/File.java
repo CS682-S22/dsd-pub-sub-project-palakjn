@@ -2,8 +2,8 @@ package models;
 
 import configurations.BrokerConstants;
 import controllers.FileManager;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import utilities.NodeTimer;
 
 import java.util.ArrayList;
@@ -33,8 +33,12 @@ public class File {
     }
 
     public synchronized void write(byte[] data) {
-        if (data.length > (BrokerConstants.MAX_SEGMENT_SIZE - segment.getSize()) || timer.isTimeout()) {
-            logger.debug(String.format("Either new data length %d exceed available size %d or time-out happen: %b. Flushing the segment %d to the disk.", data.length, BrokerConstants.MAX_SEGMENT_SIZE - segment.getSize(), timer.isTimeout(), segment.getSegment()));
+        segment.write(data);
+        segment.addOffset(totalSize);
+        totalSize += data.length;
+
+        if (segment.getNumOfLogs() == BrokerConstants.MAX_SEGMENT_MESSAGES || timer.isTimeout()) {
+            logger.debug(String.format("Either number of logs in the segment %d equal to the max %d or time-out happen: %b. Flushing the segment %d to the disk.", segment.getNumOfLogs(), BrokerConstants.MAX_SEGMENT_MESSAGES, timer.isTimeout(), segment.getSegment()));
 
             if (segment.flush()) {
                 logger.info(String.format("Flushed the segment %d to the disk. It is available to read", segment.getSegment()));
@@ -49,9 +53,5 @@ public class File {
             timer.stopTimer();
             timer.startTimer("Segment", BrokerConstants.SEGMENT_FLUSH_TIME);
         }
-
-        segment.write(data);
-        segment.addOffset(totalSize);
-        totalSize += data.length;
     }
 }
