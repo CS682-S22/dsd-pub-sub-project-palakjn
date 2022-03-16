@@ -18,6 +18,7 @@ public class File {
     private int segmentsToRead;       //Total number of segments available to read
     private final java.lang.Object lockObject = new java.lang.Object();
     private Thread thread;
+    private volatile boolean isFlushed;
 
     public File() {
         segments = new ArrayList<>();
@@ -43,6 +44,7 @@ public class File {
                     }
                 }
 
+                isFlushed = false;
                 thread = new Thread(this::waitingToFlush);
                 thread.start();
             }
@@ -52,7 +54,8 @@ public class File {
             totalSize += data.length;
 
             if (segment.getNumOfLogs() == BrokerConstants.MAX_SEGMENT_MESSAGES) {
-                lockObject.notifyAll();
+                flush();
+                isFlushed = true;
             }
         }
     }
@@ -66,7 +69,9 @@ public class File {
                logger.error(String.format("Unable to let thread to wait for %d amount of time.", BrokerConstants.SEGMENT_FLUSH_TIME), e);
            }
 
-           flush();
+           if (!isFlushed) {
+               flush();
+           }
        }
     }
 
@@ -83,5 +88,7 @@ public class File {
         }
 
         segment = new Segment(parentLocation, segmentsToRead + 1);
+
+        isFlushed = false;
     }
 }

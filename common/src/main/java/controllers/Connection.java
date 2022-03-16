@@ -31,6 +31,12 @@ public class Connection implements Sender, Receiver {
         this.sourcePort = sourcePort;
     }
 
+    public Connection(Socket channel, String destinationIPAddress, int destinationPort) {
+        this.channel = channel;
+        this.destinationIPAddress = destinationIPAddress;
+        this.destinationPort = destinationPort;
+    }
+
     public Connection() {}
 
     /**

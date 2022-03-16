@@ -1,7 +1,5 @@
 package utilities;
 
-import configuration.Constants;
-
 import java.util.Timer;
 import java.util.TimerTask;
 

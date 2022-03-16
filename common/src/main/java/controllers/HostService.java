@@ -40,7 +40,7 @@ public class HostService {
 
         while (running) {
             if (timer.isTimeout()) {
-                logger.warn(String.format("[%s:%d] Time-out happen for the packet %s to the host %s:%d. Re-sending the packet.", connection.getSourceIPAddress(), connection.getSourcePort(), packetName, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                logger.warn(String.format("[%s:%d] Time-out happen for the packet %s to the host. Re-sending the packet.", connection.getDestinationIPAddress(), connection.getDestinationPort(), packetName));
                 connection.send(packet);
                 timer.startTimer(packetName, Constants.RTT);
             } else if (connection.isAvailable()) {
@@ -51,12 +51,12 @@ public class HostService {
 
                     if (header != null) {
                         if (header.getType() == Constants.TYPE.ACK.getValue()) {
-                            logger.info(String.format("[%s:%d] Received an acknowledgment for the %s request from the host %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), packetName, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                            logger.info(String.format("[%s:%d] Received an acknowledgment for the %s request from the host.", connection.getDestinationIPAddress(), connection.getDestinationPort(), packetName));
                             timer.stopTimer();
                             running = false;
                             isSuccess = true;
                         } else if (header.getType() == Constants.TYPE.NACK.getValue()) {
-                            logger.warn(String.format("[%s:%d] Received negative acknowledgment for the %s request from the host %s:%d. Not retrying.", connection.getSourceIPAddress(), connection.getSourcePort(), packetName, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                            logger.warn(String.format("[%s:%d] Received negative acknowledgment for the %s request from the host. Not retrying.", connection.getDestinationIPAddress(), connection.getDestinationPort(), packetName));
                             timer.stopTimer();
                             running = false;
                         }

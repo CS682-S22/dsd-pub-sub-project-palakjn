@@ -13,6 +13,10 @@ public class Host extends Object {
         this.port = port;
     }
 
+    public Host() {
+
+    }
+
     public String getAddress() {
         return address;
     }

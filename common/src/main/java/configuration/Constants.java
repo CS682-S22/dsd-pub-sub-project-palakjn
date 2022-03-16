@@ -74,9 +74,10 @@ public class Constants {
 
     public enum PROPERTY_KEY {
         BROKER(0),
-        OFFSET(1),
-        TOPIC(2),
-        METHOD(3);
+        LOADBALANCER(1),
+        SOURCE(2),
+        OFFSET(3),
+        METHOD(4);
 
         private final int value;
         PROPERTY_KEY(int value) {

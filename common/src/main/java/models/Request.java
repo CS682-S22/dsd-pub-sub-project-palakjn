@@ -8,6 +8,14 @@ public class Request extends Object {
     private String topicName;
     private int partition;
 
+    public Request(int type, String topicName, int partition) {
+        this.type = type;
+        this.topicName = topicName;
+        this.partition = partition;
+    }
+
+    public Request() {}
+
     public int getType() {
         return type;
     }
