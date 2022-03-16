@@ -71,4 +71,20 @@ public class Constants {
 
         return result;
     }
+
+    public enum PROPERTY_KEY {
+        BROKER(0),
+        OFFSET(1),
+        TOPIC(2),
+        METHOD(3);
+
+        private final int value;
+        PROPERTY_KEY(int value) {
+            this.value = value;
+        }
+
+        public int getValue() {
+            return value;
+        }
+    }
 }

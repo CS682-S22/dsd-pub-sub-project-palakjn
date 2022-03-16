@@ -1,6 +1,5 @@
 package controllers;
 
-import configuration.Constants;
 import configurations.BrokerConstants;
 import models.*;
 import org.apache.logging.log4j.LogManager;
@@ -52,9 +51,12 @@ public class LBHandler {
 
                         for (Partition partition : topic.getPartitions()) {
                             File file = new File();
-                            file.initialize(String.format(BrokerConstants.TOPIC_LOCATION, connection.getSourceIPAddress(), connection.getSourcePort()), partition.getTopicName(), partition.getNumber());
-                            CacheManager.addPartition(partition.getTopicName(), partition.getNumber(), file);
-                            logger.info(String.format("[%s:%d] Added topic %s - partition %d information to the local cache.", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
+                            if (file.initialize(String.format(BrokerConstants.TOPIC_LOCATION, connection.getSourceIPAddress(), connection.getSourcePort()), partition.getTopicName(), partition.getNumber())) {
+                                CacheManager.addPartition(partition.getTopicName(), partition.getNumber(), file);
+                                logger.info(String.format("[%s:%d] Added topic %s - partition %d information to the local cache.", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
+                            } else {
+                                logger.warn(String.format("[%s:%d] Fail to create directory for the topic- %s - Partition %d", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
+                            }
                         }
 
                         hostService.sendACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
@@ -69,7 +71,7 @@ public class LBHandler {
                 }
             } else {
                 logger.warn(String.format("[%s:%d] Received empty request body from the producer. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                hostService.sendNACK(Constants.REQUESTER.BROKER, header.getSeqNum());
+                hostService.sendNACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
             }
         } else {
             logger.warn(String.format("[%s:%d] Received unsupported action %d from the load balancer. Will send NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getType()));
