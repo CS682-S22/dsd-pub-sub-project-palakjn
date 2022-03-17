@@ -1,5 +1,6 @@
+package controllers;
+
 import configuration.Constants;
-import controllers.Client;
 import models.Partition;
 import models.Properties;
 import org.apache.logging.log4j.LogManager;

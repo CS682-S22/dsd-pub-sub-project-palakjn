@@ -3,14 +3,18 @@ package controllers;
 import configuration.Constants;
 import configurations.Config;
 import models.Header;
+import models.Properties;
 import models.Topic;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import utilities.AppPacketHandler;
 import utilities.NodeTimer;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 public class Processor {
@@ -19,6 +23,8 @@ public class Processor {
     public void process(Config config) {
         if (config.isCreateTopic()) {
             createTopics(config);
+        } else if (config.isProducer()) {
+            produce(config);
         }
     }
 
@@ -79,5 +85,33 @@ public class Processor {
         } catch (IOException exception) {
             logger.error(String.format("[%s:%d] Fail to make connection with the load balancer.", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort()), exception);
         }
+    }
+
+    private void produce(Config config) {
+        Properties properties = new Properties();
+        properties.put(Constants.PROPERTY_KEY.LOADBALANCER, String.format("%s:%d", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort()));
+
+        Producer producer = new Producer(properties);
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(config.getLocation()))) {
+            String line = reader.readLine();
+            int total = 0;
+            int success = 0;
+
+            while (line != null) {
+                if(producer.send(config.getTopicName(), config.getKey(), line.getBytes(StandardCharsets.UTF_8))) {
+                    success++;
+                }
+
+                line = reader.readLine();
+                total++;
+            }
+
+            System.out.printf("[Topic: %s - Key: %d] Send %d logs from the location %s to the broker. Failed: %d. \n", config.getTopicName(), config.getKey(), success, config.getLocation(), total - success);
+        } catch (IOException exception) {
+            logger.error(String.format("Unable to open the file at the location %s.", config.getLocation()), exception);
+        }
+
+        producer.close();
     }
 }

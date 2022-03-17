@@ -66,7 +66,9 @@ public class Application {
             System.out.println("Invalid topic information found in the config");
         } else if (config.isProducer() && config.isConsumer()) {
             System.out.println("Node can't be both producer/consumer. Provide correct information.");
-        } else if ((config.isProducer() || config.isConsumer()) && Strings.isNullOrEmpty(config.getLocation())) {
+        } else if ((config.isProducer() || config.isConsumer()) && (Strings.isNullOrEmpty(config.getLocation()) ||
+                                                                    Strings.isNullOrEmpty(config.getTopicName()) ||
+                                                                    config.getKey() == 0)) {
             System.out.println("No logs details found");
         } else {
             flag = true;
