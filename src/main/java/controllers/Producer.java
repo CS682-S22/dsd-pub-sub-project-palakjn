@@ -1,6 +1,7 @@
 package controllers;
 
 import configuration.Constants;
+import configurations.AppConstants;
 import models.Partition;
 import models.Properties;
 import org.apache.logging.log4j.LogManager;
@@ -14,20 +15,22 @@ import java.util.concurrent.LinkedBlockingDeque;
 public class Producer extends Client {
     private BlockingQueue<byte[]> queue;
     private ExecutorService threadPool;
-    private boolean running = true;
+    private volatile boolean running = true;
 
     public Producer(Properties properties) {
         super(LogManager.getLogger(Producer.class), properties);
 
-        queue = new LinkedBlockingDeque<>(100);
-        this.threadPool = Executors.newFixedThreadPool(1);
+        queue = new LinkedBlockingDeque<>(AppConstants.QUEUE_BUFFER_SIZE);
+        this.threadPool = Executors.newFixedThreadPool(AppConstants.THREAD_COUNT);
     }
 
     public void send(String topic, int key, byte[] data) {
         if (!isConnected) {
-            byte[] packet = AppPacketHandler.createToBrokerRequest(topic, key);
+            byte[] lbPacket = AppPacketHandler.createGetBrokerReq(AppConstants.REQUESTER.PRODUCER, topic, key);
+            byte[] brokerRequest = AppPacketHandler.createToBrokerRequest(AppConstants.REQUESTER.PRODUCER, AppConstants.TYPE.ADD, topic, key);
+
             if ((broker != null ||
-                    getBroker(topic, key)) && connectToBroker(packet, Constants.TYPE.ADD.name())) {
+                    getBroker(lbPacket, topic, key)) && connectToBroker(brokerRequest, AppConstants.TYPE.ADD.name())) {
                 isConnected = true;
 
                 threadPool.execute(this::send);
@@ -58,22 +61,5 @@ public class Producer extends Client {
                 logger.error("Interrupted while getting data to post to the broker", e);
             }
         }
-    }
-
-    private boolean getBroker(String topic, int partitionNum) {
-        boolean isSuccess = false;
-
-        byte[] packet = AppPacketHandler.createGetBrokerReq(topic, partitionNum);
-        Partition partition = getBroker(packet);
-
-        if (partition != null && partition.getBroker() != null && partition.getBroker().isValid()) {
-            broker = partition.getBroker();
-            isSuccess = true;
-            logger.info(String.format("Received broker information: %s:%d which is holding the information of topic %s - partition %d.", broker.getAddress(), broker.getPort(), topic, partitionNum));
-        } else {
-            logger.warn(String.format("No broker information found which is holding the information of topic %s - partition %d.",  topic, partitionNum));
-        }
-
-        return isSuccess;
     }
 }

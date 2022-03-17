@@ -34,6 +34,22 @@ public class Client {
         hostService = new HostService(logger);
     }
 
+    protected boolean getBroker(byte[] packet, String topic, int partitionNum) {
+        boolean isSuccess = false;
+
+        Partition partition = getBroker(packet);
+
+        if (partition != null && partition.getBroker() != null && partition.getBroker().isValid()) {
+            broker = partition.getBroker();
+            isSuccess = true;
+            logger.info(String.format("Received broker information: %s:%d which is holding the information of topic %s - partition %d.", broker.getAddress(), broker.getPort(), topic, partitionNum));
+        } else {
+            logger.warn(String.format("No broker information found which is holding the information of topic %s - partition %d.",  topic, partitionNum));
+        }
+
+        return isSuccess;
+    }
+
     protected Partition getBroker(byte[] packet) {
         Partition partition = null;
 
@@ -111,6 +127,16 @@ public class Client {
         return isSuccess;
     }
 
+    //cite: https://www.baeldung.com/java-check-string-number
+    protected boolean isNumeric(String strNum) {
+        if (strNum == null) {
+            return false;
+        }
+
+        Pattern pattern = Pattern.compile("\\d+");
+        return pattern.matcher(strNum).matches();
+    }
+
     private Host getHostInfo(String detail) {
         Host host = null;
 
@@ -122,15 +148,5 @@ public class Client {
         }
 
         return host;
-    }
-
-    //cite: https://www.baeldung.com/java-check-string-number
-    private boolean isNumeric(String strNum) {
-        if (strNum == null) {
-            return false;
-        }
-
-        Pattern pattern = Pattern.compile("\\d+");
-        return pattern.matcher(strNum).matches();
     }
 }

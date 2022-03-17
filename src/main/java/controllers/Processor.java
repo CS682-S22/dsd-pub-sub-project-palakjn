@@ -1,6 +1,6 @@
 package controllers;
 
-import configuration.Constants;
+import configurations.AppConstants;
 import configurations.Config;
 import models.Header;
 import models.Properties;
@@ -47,7 +47,7 @@ public class Processor {
                     byte[] packet = AppPacketHandler.createAddTopicPacket(topic, seqNum);
 
                     connection.send(packet);
-                    timer.startTimer("TOPIC", Constants.RTT);
+                    timer.startTimer("TOPIC", AppConstants.RTT);
                     boolean reading = true;
 
                     while (reading) {
@@ -55,7 +55,7 @@ public class Processor {
                             logger.warn(String.format("[%s:%d] Timeout happen for the packet having topic %s - partition count %d information. Sending again", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort(), topic.getName(), topic.getNumOfPartitions()));
                             connection.send(packet);
                             timer.stopTimer();
-                            timer.startTimer("TOPIC", Constants.RTT);
+                            timer.startTimer("TOPIC", AppConstants.RTT);
                         } else if (connection.isAvailable()) {
                             byte[] responseInBytes = connection.receive();
 
@@ -63,7 +63,7 @@ public class Processor {
                                 Header.Content header = AppPacketHandler.getHeader(responseInBytes);
 
                                 if (header != null) {
-                                    if (header.getType() == Constants.TYPE.ACK.getValue()) {
+                                    if (header.getType() == AppConstants.TYPE.ACK.getValue()) {
                                         if (header.getSeqNum() == seqNum) {
                                             logger.info(String.format("[%s:%d] Received an acknowledgment for the packet with the sequence number %d.", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort(), seqNum));
                                             reading = false;
@@ -72,7 +72,7 @@ public class Processor {
                                         } else if (header.getSeqNum() < seqNum) {
                                             logger.info(String.format("[%s:%d] Received an acknowledgment for the older packet with the sequence number %d. Ignoring it.", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort(), header.getSeqNum()));
                                         }
-                                    } else if (header.getType() == Constants.TYPE.NACK.getValue()) {
+                                    } else if (header.getType() == AppConstants.TYPE.NACK.getValue()) {
                                         logger.info(String.format("[%s:%d] Received a negative acknowledgment for the packet having topic %s - partition count %d information.", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort(), topic.getName(), topic.getNumOfPartitions()));
                                         reading = false;
                                     }
@@ -89,7 +89,7 @@ public class Processor {
 
     private void produce(Config config) {
         Properties properties = new Properties();
-        properties.put(Constants.PROPERTY_KEY.LOADBALANCER, String.format("%s:%d", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort()));
+        properties.put(AppConstants.PROPERTY_KEY.LOADBALANCER, String.format("%s:%d", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort()));
 
         Producer producer = new Producer(properties);
 
