@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Configuration status="ALL">
     <Appenders>
-        <RollingFile name="appender" fileName="logs/loadbalancer.log"
+        <RollingFile name="lbAppender" fileName="logs/loadbalancer.log"
                      filePattern="logs/loadbalancer-%d{MM-dd-yyyy}-%i.log.gz">
             <PatternLayout>
                 <Pattern>%d %p %c{1.} [%t] %m%n</Pattern>
@@ -14,7 +14,7 @@
     </Appenders>
     <Loggers>
         <Root level="trace">
-            <AppenderRef ref="appender" level="ALL"/>
+            <AppenderRef ref="lbAppender" level="ALL"/>
         </Root>
     </Loggers>
 </Configuration>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Configuration status="ALL">
     <Appenders>
-        <RollingFile name="file" fileName="logs/broker.log"
+        <RollingFile name="brokerAppender" fileName="logs/broker.log"
                      filePattern="logs/broker-%d{MM-dd-yyyy}-%i.log.gz">
             <PatternLayout>
                 <Pattern>%d %p %c{1.} [%t] %m%n</Pattern>
@@ -14,7 +14,7 @@
     </Appenders>
     <Loggers>
         <Root level="trace">
-            <AppenderRef ref="file" level="ALL"/>
+            <AppenderRef ref="brokerAppender" level="ALL"/>
         </Root>
     </Loggers>
 </Configuration>

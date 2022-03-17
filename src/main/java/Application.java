@@ -10,6 +10,7 @@ import java.nio.file.Paths;
 
 public class Application {
     public static void main(String[] args) {
+
         Application application = new Application();
 
         String location = application.getConfigLocation(args);

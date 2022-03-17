@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Configuration status="ALL">
     <Appenders>
-        <RollingFile name="appender" fileName="logs/producer.log"
+        <RollingFile name="prodAppender" fileName="logs/producer.log"
                      filePattern="logs/producer-%d{MM-dd-yyyy}-%i.log.gz">
             <PatternLayout>
                 <Pattern>%d %p %c{1.} [%t] %m%n</Pattern>
@@ -14,7 +14,7 @@
     </Appenders>
     <Loggers>
         <Root level="trace">
-            <AppenderRef ref="appender" level="ALL"/>
+            <AppenderRef ref="prodAppender" level="ALL"/>
         </Root>
     </Loggers>
 </Configuration>
