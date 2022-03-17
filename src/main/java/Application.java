@@ -68,7 +68,7 @@ public class Application {
             System.out.println("Node can't be both producer/consumer. Provide correct information.");
         } else if ((config.isProducer() || config.isConsumer()) && (Strings.isNullOrEmpty(config.getLocation()) ||
                                                                     Strings.isNullOrEmpty(config.getTopicName()) ||
-                                                                    config.getKey() == 0)) {
+                                                                    config.getKey() < 0)) {
             System.out.println("No logs details found");
         } else {
             flag = true;

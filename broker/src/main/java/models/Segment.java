@@ -52,7 +52,15 @@ public class Segment {
         return isSuccess;
     }
 
+    public boolean isEmpty() {
+        return buffer == null;
+    }
+
    public int getNumOfLogs() {
         return numOfLogs;
    }
+
+    public String getLocation() {
+        return location;
+    }
 }

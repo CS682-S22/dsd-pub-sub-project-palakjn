@@ -7,6 +7,8 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class File {
     private static final Logger logger = LogManager.getLogger(File.class);
@@ -16,8 +18,7 @@ public class File {
     private Segment segment;
     private long totalSize;           //Total size of messages received for the partition
     private int segmentsToRead;       //Total number of segments available to read
-    private final java.lang.Object lockObject = new java.lang.Object();
-    private Thread thread;
+    private Timer timer;
     private volatile boolean isFlushed;
 
     public File() {
@@ -32,63 +33,50 @@ public class File {
         return fileManager.createDirectory(parentLocation, String.format("%s/%d", topic, partition));
     }
 
-    public void write(byte[] data) {
-        synchronized (lockObject) {
-            if (segment.getSegment() == 0) {
-                //start timer
-                if (thread != null) {
-                    try {
-                        thread.join();
-                    } catch (InterruptedException e) {
-                        logger.error(String.format("Unable to let thread to wait for %d amount of time.", BrokerConstants.SEGMENT_FLUSH_TIME), e);
-                    }
+    public synchronized void write(byte[] data) {
+        if (segment.isEmpty()) {
+            //start timer when writing to the new segment
+            timer = new Timer();
+            TimerTask task = new TimerTask() {
+                public void run() {
+                    logger.debug("Time-out happen. Will flush the segment");
+                    timer.cancel();
+                    this.cancel();
+
+                    flush();
                 }
+            };
 
-                isFlushed = false;
-                thread = new Thread(this::waitingToFlush);
-                thread.start();
-            }
+            timer.schedule(task, BrokerConstants.SEGMENT_FLUSH_TIME);
+            isFlushed = false;
+        }
 
-            segment.write(data);
-            segment.addOffset(totalSize);
-            totalSize += data.length;
+        segment.write(data);
+        segment.addOffset(totalSize);
+        totalSize += data.length;
 
-            if (segment.getNumOfLogs() == BrokerConstants.MAX_SEGMENT_MESSAGES) {
-                flush();
-                isFlushed = true;
-            }
+        if (segment.getNumOfLogs() == BrokerConstants.MAX_SEGMENT_MESSAGES) {
+            flush();
+            timer.cancel();
         }
     }
 
-    //Create a thread which is assigned this function and waiting until another thread don't release the lock.
-    public void waitingToFlush() {
-       synchronized (lockObject) {
-           try {
-               lockObject.wait(BrokerConstants.SEGMENT_FLUSH_TIME);
-           } catch (InterruptedException e) {
-               logger.error(String.format("Unable to let thread to wait for %d amount of time.", BrokerConstants.SEGMENT_FLUSH_TIME), e);
-           }
+    private synchronized void flush() {
+        if (!isFlushed) {
+            logger.debug(String.format("Either number of logs in the segment %d equal to the max %d or time-out happen. Flushing the segment %d to the disk.", segment.getNumOfLogs(), BrokerConstants.MAX_SEGMENT_MESSAGES, segment.getSegment()));
 
-           if (!isFlushed) {
-               flush();
-           }
-       }
-    }
+            if (segment.flush()) {
+                logger.info(String.format("Flushed the segment %d to the disk. It is available to read", segment.getSegment()));
+                segments.add(segment);
+                segmentsToRead++;
+            } else {
+                //If failure happen while writing to the local disk then, data loss will happen.
+                logger.warn(String.format("Fail while flushing segment %d to the disk. Data in the segment is lost and not available to read", segment.getSegment()));
+            }
 
-    private void flush() {
-        logger.debug(String.format("Either number of logs in the segment %d equal to the max %d or time-out happen. Flushing the segment %d to the disk.", segment.getNumOfLogs(), BrokerConstants.MAX_SEGMENT_MESSAGES, segment.getSegment()));
+            segment = new Segment(parentLocation, segmentsToRead);
 
-        if (segment.flush()) {
-            logger.info(String.format("Flushed the segment %d to the disk. It is available to read", segment.getSegment()));
-            segments.add(segment);
-            segmentsToRead++;
-        } else {
-            //If failure happen while writing to the local disk then, data loss will happen.
-            logger.warn(String.format("Fail while flushing segment %d to the disk. Data in the segment is lost and not available to read", segment.getSegment()));
+            isFlushed = true;
         }
-
-        segment = new Segment(parentLocation, segmentsToRead + 1);
-
-        isFlushed = false;
     }
 }

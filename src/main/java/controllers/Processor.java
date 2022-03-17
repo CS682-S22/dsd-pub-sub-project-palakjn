@@ -95,23 +95,15 @@ public class Processor {
 
         try (BufferedReader reader = new BufferedReader(new FileReader(config.getLocation()))) {
             String line = reader.readLine();
-            int total = 0;
-            int success = 0;
 
             while (line != null) {
-                if(producer.send(config.getTopicName(), config.getKey(), line.getBytes(StandardCharsets.UTF_8))) {
-                    success++;
-                }
-
+                producer.send(config.getTopicName(), config.getKey(), line.getBytes(StandardCharsets.UTF_8));
                 line = reader.readLine();
-                total++;
             }
-
-            System.out.printf("[Topic: %s - Key: %d] Send %d logs from the location %s to the broker. Failed: %d. \n", config.getTopicName(), config.getKey(), success, config.getLocation(), total - success);
         } catch (IOException exception) {
             logger.error(String.format("Unable to open the file at the location %s.", config.getLocation()), exception);
         }
 
-        producer.close();
+        //producer.close();
     }
 }

@@ -16,6 +16,7 @@ public class ProducerHandler {
     private Connection connection;
 
     public ProducerHandler(Connection connection) {
+        this.connection = connection;
         hostService = new HostService(logger);
     }
 
@@ -24,7 +25,7 @@ public class ProducerHandler {
             byte[] body = BrokerPacketHandler.getData(message);
 
             if (body != null) {
-                Request request = JSONDesrializer.fromJson(message, Request.class);
+                Request request = JSONDesrializer.fromJson(body, Request.class);
 
                 if (request != null && request.isValid()) {
                     logger.info(String.format("[%s:%d] Received request to add the logs for the topic %s - partition %d from the producer.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getTopicName(), request.getPartition()));
@@ -56,6 +57,7 @@ public class ProducerHandler {
         boolean reading = true;
 
         while (reading) {
+            logger.debug("Waiting for new data");
             byte[] message = connection.receive();
 
             if (message != null) {
