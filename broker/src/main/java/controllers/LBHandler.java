@@ -16,10 +16,13 @@ public class LBHandler {
     private Connection connection;
 
     public LBHandler(Connection connection) {
-        hostService = new HostService(connection, logger);
+        this.connection = connection;
+        hostService = new HostService(logger);
     }
 
-    public LBHandler() {}
+    public LBHandler() {
+        hostService = new HostService(logger);
+    }
 
     public boolean join(Host brokerInfo, Host loadBalancerInfo) {
         return send(brokerInfo, loadBalancerInfo, BrokerConstants.TYPE.ADD);
@@ -45,7 +48,7 @@ public class LBHandler {
                     //First checking if topic already exits
                     if (CacheManager.iSTopicExist(topic.getName())) {
                         logger.warn(String.format("[%s:%d] Broker already handling the topic %s. Will send NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
-                        hostService.sendNACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                        hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                     } else if (topic.getNumOfPartitions() > 0) {
                         CacheManager.addTopic(topic.getName());
 
@@ -54,28 +57,29 @@ public class LBHandler {
                             if (file.initialize(String.format(BrokerConstants.TOPIC_LOCATION, connection.getSourceIPAddress(), connection.getSourcePort()), partition.getTopicName(), partition.getNumber())) {
                                 CacheManager.addPartition(partition.getTopicName(), partition.getNumber(), file);
                                 logger.info(String.format("[%s:%d] Added topic %s - partition %d information to the local cache.", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
+                                System.out.printf("Handling topic %s - partition %d.\n", partition.getTopicName(), partition.getNumber());
                             } else {
                                 logger.warn(String.format("[%s:%d] Fail to create directory for the topic- %s - Partition %d", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
                             }
                         }
 
-                        hostService.sendACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                        hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                         isSuccess = true;
                     } else {
                         logger.warn(String.format("[%s:%d] Received no partitions for the topic %s from the load balancer. Will send NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
-                        hostService.sendNACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                        hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                     }
                 } else {
                     logger.warn(String.format("[%s:%d] Received invalid topic information from the load balancer. Will send NACK", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                    hostService.sendNACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                    hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                 }
             } else {
                 logger.warn(String.format("[%s:%d] Received empty request body from the producer. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                hostService.sendNACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
             }
         } else {
             logger.warn(String.format("[%s:%d] Received unsupported action %d from the load balancer. Will send NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getType()));
-            hostService.sendNACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+            hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
         }
 
         return isSuccess;
@@ -90,11 +94,11 @@ public class LBHandler {
 
             Connection connection = new Connection(socket, loadBalancerInfo.getAddress(), loadBalancerInfo.getPort(), brokerInfo.getAddress(), brokerInfo.getPort());
             if (connection.openConnection()) {
-                HostService service = new HostService(connection, logger);
                 byte[] packet = BrokerPacketHandler.createPacket(brokerInfo, type);
-                isSuccess = service.sendPacketWithACK(packet, String.format("%s:%s", BrokerConstants.REQUESTER.BROKER.name(), type.name()));
+                isSuccess = hostService.sendPacketWithACK(connection, packet, String.format("%s:%s", BrokerConstants.REQUESTER.BROKER.name(), type.name()));
                 if (isSuccess) {
                     logger.info("Successfully joined to the network");
+                    System.out.println("Successfully joined to the network");
                 }
             }
         } catch (IOException exception) {

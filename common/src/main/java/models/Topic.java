@@ -29,8 +29,11 @@ public class Topic extends Object {
     }
 
     public void addPartition(Partition partition) {
-        this.partitions.add(partition);
-        this.numOfPartitions++;
+        if (partitions == null) {
+            partitions = new ArrayList<>();
+        }
+        partitions.add(partition);
+        numOfPartitions++;
     }
 
     public boolean isValid() {

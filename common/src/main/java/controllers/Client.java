@@ -21,6 +21,7 @@ public class Client {
     protected Host broker;
     protected Host loadBalancer;
     protected Connection connection;
+    protected HostService hostService;
 
     public Client(Logger logger, Properties properties) {
         this.logger = logger;
@@ -30,6 +31,7 @@ public class Client {
 
         broker = getHostInfo(brokerInfo);
         loadBalancer = getHostInfo(loadBalancerInfo);
+        hostService = new HostService(logger);
     }
 
     protected Partition getBroker(byte[] packet) {
@@ -51,6 +53,7 @@ public class Client {
                     if (timer.isTimeout()) {
                         logger.warn(String.format("[%s:%d] Time-out happen for the REQ packet to the host. Re-sending the packet.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
                         connection.send(packet);
+                        timer.stopTimer();
                         timer.startTimer(Constants.TYPE.REQ.name(), Constants.RTT);
                     } else if (connection.isAvailable()) {
                         byte[] responseBytes = connection.receive();
@@ -99,8 +102,7 @@ public class Client {
 
             connection = new Connection(socket, broker.getAddress(), broker.getPort());
             if (connection.openConnection()) {
-                HostService hostService = new HostService(connection, logger);
-                isSuccess = hostService.sendPacketWithACK(packet, packetName);
+                isSuccess = hostService.sendPacketWithACK(connection, packet, packetName);
             }
         } catch (IOException exception) {
             logger.error(String.format("[%s:%d] Fail to make connection with the broker.", broker.getAddress(), broker.getPort()), exception.getMessage());

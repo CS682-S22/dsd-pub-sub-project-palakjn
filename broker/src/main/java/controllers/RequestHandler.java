@@ -14,7 +14,7 @@ public class RequestHandler {
 
     public RequestHandler(Connection connection) {
         this.connection = connection;
-        this.hostService = new HostService(connection, logger);
+        this.hostService = new HostService(logger);
     }
 
     public void process() {
@@ -22,6 +22,7 @@ public class RequestHandler {
         int curSeq = 0;
 
         while (running) {
+            logger.debug("Waiting for request");
             byte[] request = connection.receive();
 
             if (request != null) {
@@ -32,10 +33,10 @@ public class RequestHandler {
                     if (header.getSeqNum() == curSeq) {
                         LBHandler lbHandler = new LBHandler(connection);
                         if (lbHandler.processRequest(header, request)) {
-                            curSeq = curSeq == 0 ? 1 : 0;
+                            curSeq++;
                         }
-                    } else if ((curSeq == 0 && header.getSeqNum() == 1) || (curSeq == 1 && header.getSeqNum() == 0)) {
-                        hostService.sendACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                    } else if (header.getSeqNum() < curSeq) {
+                        hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                     }
                 } else if (header.getRequester() == BrokerConstants.REQUESTER.PRODUCER.getValue()) {
                     logger.info("Received request from Producer.");

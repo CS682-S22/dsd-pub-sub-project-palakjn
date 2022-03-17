@@ -22,7 +22,7 @@ public class RequestHandler {
 
     public RequestHandler(Connection connection) {
         this.connection = connection;
-        this.hostService = new HostService(connection, logger);
+        this.hostService = new HostService(logger);
     }
 
     public void process() {
@@ -38,9 +38,9 @@ public class RequestHandler {
                     if (header.getSeqNum() == curSeq) {
                         logger.info(String.format("[%s:%d] Received request from broker with sequence number: %d", connection.getDestinationIPAddress(), connection.getDestinationPort(), curSeq));
                         processBrokerRequest(request, header.getType());
-                    } else if ((curSeq == 0 && header.getSeqNum() == 1) || (curSeq == 1 && header.getSeqNum() == 0)) {
+                    } else if (header.getSeqNum() < curSeq) {
                         logger.info(String.format("[%s:%d] Received another same request from broker with sequence number: %d. Sending acknowledgement.", connection.getDestinationIPAddress(), connection.getDestinationPort(), curSeq));
-                        hostService.sendACK(Constants.REQUESTER.LOAD_BALANCER, header.getSeqNum());
+                        hostService.sendACK(connection, Constants.REQUESTER.LOAD_BALANCER, header.getSeqNum());
                     }
                 } else if ((header.getRequester() == Constants.REQUESTER.PRODUCER.getValue() ||
                         header.getRequester() == Constants.REQUESTER.CONSUMER.getValue()) &&
@@ -51,9 +51,9 @@ public class RequestHandler {
                     if (header.getSeqNum() == curSeq) {
                         logger.info(String.format("[%s:%d] Received request from host with sequence number: %d to create the topic", connection.getDestinationIPAddress(), connection.getDestinationPort(), curSeq));
                         processTopicRequest(request, header.getType());
-                    } else if ((curSeq == 0 && header.getSeqNum() == 1) || (curSeq == 1 && header.getSeqNum() == 0)) {
+                    } else if (header.getSeqNum() < curSeq) {
                         logger.info(String.format("[%s:%d] Received another same request from host with sequence number: %d to create the topic. Sending an acknowledgement.", connection.getDestinationIPAddress(), connection.getDestinationPort(), curSeq));
-                        hostService.sendACK(Constants.REQUESTER.LOAD_BALANCER, header.getSeqNum());
+                        hostService.sendACK(connection, Constants.REQUESTER.LOAD_BALANCER, header.getSeqNum());
                     }
                 }
             } else {
@@ -74,17 +74,18 @@ public class RequestHandler {
                     CacheManager.addBroker(broker);
                     sendAck();
                     logger.info(String.format("[%s:%d] Added the broker to the collection.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                    System.out.printf("Broker %s:%d joined the network.\n", connection.getDestinationIPAddress(), connection.getDestinationPort());
                 } else if (action == Constants.TYPE.REM.getValue()) {
                     logger.warn(String.format("[%s:%d] Received REMOVE request from the broker. Removing the broker from the collection.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
                     CacheManager.removeBroker(broker);
                     sendAck();
                 } else {
                     logger.warn(String.format("[%s:%d] Received unsupported request type %s from the broker. Sending NACK packet.", connection.getDestinationIPAddress(), connection.getDestinationPort(), Constants.TYPE.values()[action].name()));
-                    hostService.sendNACK(Constants.REQUESTER.LOAD_BALANCER, curSeq);
+                    hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
                 }
             } else {
                 logger.warn(String.format("[%s:%d] Received invalid broker information from the broker. Sending NACK packet.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                hostService.sendNACK(Constants.REQUESTER.LOAD_BALANCER, curSeq);
+                hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
             }
         }
     }
@@ -106,7 +107,7 @@ public class RequestHandler {
                     } else {
                         //Topic don't exist
                         logger.warn(String.format("[%s:%d] There is no topic with the name %s exit. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getTopicName()));
-                        hostService.sendNACK(Constants.REQUESTER.LOAD_BALANCER);
+                        hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER);
                     }
                 } else {
                     //Requesting for a partition
@@ -117,12 +118,12 @@ public class RequestHandler {
                     } else {
                         //Partition don't exit
                         logger.warn(String.format("[%s:%d] There is no partition %d of the topic with the name as %s. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getPartition(), request.getTopicName()));
-                        hostService.sendNACK(Constants.REQUESTER.LOAD_BALANCER);
+                        hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER);
                     }
                 }
             } else {
                 logger.warn(String.format("[%s:%d] Received invalid request from the another end. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                hostService.sendNACK(Constants.REQUESTER.LOAD_BALANCER);
+                hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER);
             }
         }
 
@@ -135,19 +136,21 @@ public class RequestHandler {
         byte[] body = LBPacketHandler.getData(message);
 
         if (body != null) {
-            Topic topic = JSONDesrializer.fromJson(message, Topic.class);
+            Topic topic = JSONDesrializer.fromJson(body, Topic.class);
 
             if (topic != null && topic.isValid() && topic.getNumOfPartitions() > 0) {
                 if (action == Constants.TYPE.ADD.getValue()) {
                     if (CacheManager.isTopicExist(topic.getName())) {
                         logger.warn(String.format("[%s:%d] Topic with the name %s already exist. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
-                        hostService.sendNACK(Constants.REQUESTER.LOAD_BALANCER, curSeq);
+                        hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
                     } else {
                         logger.debug(String.format("[%s:%d] Request received for distributing %d number of partitions of topic %s among %d number of brokers", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getNumOfPartitions(), topic.getName(), CacheManager.getNumberOfBrokers()));
+                        Topic newTopic = new Topic(topic.getName());
+
                         for (int index = 0; index < topic.getNumOfPartitions(); index++) {
                             Host broker = CacheManager.findBrokerWithLessLoad();
                             Partition partition = new Partition(topic.getName(), index, broker);
-                            topic.addPartition(partition);
+                            newTopic.addPartition(partition);
 
                             //logging
                             String log = String.format("[%s:%d] Broker %s:%d handling Topic %s - Partition %d.", connection.getDestinationIPAddress(), connection.getDestinationPort(), broker.getAddress(), broker.getPort(), topic.getName(), index);
@@ -155,26 +158,26 @@ public class RequestHandler {
                             System.out.println(log);
                         }
 
-                        boolean flag = CacheManager.addTopic(topic);
+                        boolean flag = CacheManager.addTopic(newTopic);
                         if (flag) {
                             sendAck();
-                            logger.debug(String.format("[%s:%d] Created topic %s with %d number of partitions. Sending the information to the respective brokers.",connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getNumOfPartitions()));
+                            logger.debug(String.format("[%s:%d] Created topic %s with %d number of partitions. Sending the information to the respective brokers.",connection.getDestinationIPAddress(), connection.getDestinationPort(), newTopic.getName(), newTopic.getNumOfPartitions()));
 
                             //Send partition information to all the brokers asynchronously. Assuming that all the brokers might be up and running
-                            sendToBrokers(topic);
+                            sendToBrokers(newTopic);
                         } else {
                             //Two requests for creating topic with same name might have received. Another thread might have added that topic before.
                             logger.warn(String.format("[%s:%d] Another instance might have created same topic. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                            hostService.sendNACK(Constants.REQUESTER.LOAD_BALANCER, curSeq);
+                            hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
                         }
                     }
                 } else {
                     logger.warn(String.format("[%s:%d] Received unsupported action %d for the topic related service. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), action));
-                    hostService.sendNACK(Constants.REQUESTER.LOAD_BALANCER, curSeq);
+                    hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
                 }
             } else {
                 logger.warn(String.format("[%s:%d] Received invalid requests to create the topic. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                hostService.sendNACK(Constants.REQUESTER.LOAD_BALANCER, curSeq);
+                hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
             }
         }
     }
@@ -201,7 +204,7 @@ public class RequestHandler {
             if (connection.openConnection()) {
                 logger.debug(String.format("[%s:%d] Sending the the topic %s - Partitions {%s} information to the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getPartitionString()));
                 byte[] packet = LBPacketHandler.createPacket(Constants.TYPE.ADD, topic);
-                hostService.sendPacketWithACK(packet, String.format("%s:%s", Constants.REQUESTER.LOAD_BALANCER.name(), Constants.TYPE.ADD.name()));
+                hostService.sendPacketWithACK(connection, packet, String.format("%s:%s", Constants.REQUESTER.LOAD_BALANCER.name(), Constants.TYPE.ADD.name()));
                 //TODO: If isSuccess == false then, remove the topic information from the cache
                 logger.info(String.format("[%s:%d] Send the topic %s - Partitions {%s} information to the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getPartitionString()));
             }
@@ -211,7 +214,7 @@ public class RequestHandler {
     }
 
     private void sendAck() {
-        hostService.sendACK(Constants.REQUESTER.LOAD_BALANCER, curSeq);
-        curSeq = curSeq == 0 ? 1 : 0;
+        hostService.sendACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
+        curSeq++;
     }
 }

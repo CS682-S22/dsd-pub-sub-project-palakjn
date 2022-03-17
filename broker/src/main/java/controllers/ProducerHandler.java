@@ -16,7 +16,7 @@ public class ProducerHandler {
     private Connection connection;
 
     public ProducerHandler(Connection connection) {
-        hostService = new HostService(connection, logger);
+        hostService = new HostService(logger);
     }
 
     public void processRequest(Header.Content header, byte[] message) {
@@ -30,25 +30,25 @@ public class ProducerHandler {
                     logger.info(String.format("[%s:%d] Received request to add the logs for the topic %s - partition %d from the producer.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getTopicName(), request.getPartition()));
 
                     if (CacheManager.isExist(request.getTopicName(), request.getPartition())) {
-                        hostService.sendACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                        hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
 
                         File file = CacheManager.getPartition(request.getTopicName(), request.getPartition());
                         receive(file);
                     } else {
                         logger.warn(String.format("[%s:%d] Current broker not holding any topic %s - partition %d. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getTopicName(), request.getPartition()));
-                        hostService.sendNACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                        hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                     }
                 } else {
                     logger.warn(String.format("[%s:%d] Received invalid request information from the producer. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                    hostService.sendNACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                    hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                 }
             } else {
                 logger.warn(String.format("[%s:%d] Received empty request body from the producer. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                hostService.sendNACK(Constants.REQUESTER.BROKER, header.getSeqNum());
+                hostService.sendNACK(connection, Constants.REQUESTER.BROKER, header.getSeqNum());
             }
         } else {
             logger.warn(String.format("[%s:%d] Received unsupported action %d from the producer. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getType()));
-            hostService.sendNACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+            hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
         }
     }
 
@@ -73,7 +73,7 @@ public class ProducerHandler {
                         }
                     } else if (header.getType() == BrokerConstants.TYPE.ADD.getValue()) {
                         logger.info(String.format("[%s:%d] Received ADD request from producer again. Sending ACK as ACK might have lost before.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                        hostService.sendACK(BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                        hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                     } else if (header.getType() == BrokerConstants.TYPE.FIN.getValue()) {
                         logger.info(String.format("[%s:%d] Received FIN from producer. Not reading anymore from the channel.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
                         reading = false;

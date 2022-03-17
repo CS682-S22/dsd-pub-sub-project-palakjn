@@ -8,29 +8,27 @@ import utilities.PacketHandler;
 
 public class HostService {
     private Logger logger;
-    private Connection connection;
 
-    public HostService(Connection connection, Logger logger) {
-        this.connection = connection;
+    public HostService(Logger logger) {
         this.logger = logger;
     }
 
-    public void sendACK(Constants.REQUESTER requester, int seqNum) {
+    public void sendACK(Connection connection, Constants.REQUESTER requester, int seqNum) {
         byte[] acknowledgement = PacketHandler.createACK(requester, seqNum);
         connection.send(acknowledgement);
     }
 
-    public void sendNACK(Constants.REQUESTER requester, int seqNum) {
+    public void sendNACK(Connection connection, Constants.REQUESTER requester, int seqNum) {
         byte[] negAck = PacketHandler.createNACK(requester, seqNum);
         connection.send(negAck);
     }
 
-    public void sendNACK(Constants.REQUESTER requester) {
+    public void sendNACK(Connection connection, Constants.REQUESTER requester) {
         byte[] negAck = PacketHandler.createNACK(requester);
         connection.send(negAck);
     }
 
-    public boolean sendPacketWithACK(byte[] packet, String packetName) {
+    public boolean sendPacketWithACK(Connection connection, byte[] packet, String packetName) {
         boolean isSuccess = false;
         NodeTimer timer = new NodeTimer();
         boolean running = true;
@@ -42,6 +40,7 @@ public class HostService {
             if (timer.isTimeout()) {
                 logger.warn(String.format("[%s:%d] Time-out happen for the packet %s to the host. Re-sending the packet.", connection.getDestinationIPAddress(), connection.getDestinationPort(), packetName));
                 connection.send(packet);
+                timer.stopTimer();
                 timer.startTimer(packetName, Constants.RTT);
             } else if (connection.isAvailable()) {
                 byte[] responseBytes = connection.receive();

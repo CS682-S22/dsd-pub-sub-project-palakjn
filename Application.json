@@ -1,0 +1,14 @@
+{
+  "loadBalancer" : {
+    "address": "localhost",
+    "port": 1700
+  },
+  "createTopic": true,
+  "topics": [{
+    "name": "Topic One",
+    "numOfPartitions": "3"
+  }],
+  "isProducer": false,
+  "isConsumer": false,
+  "location": null
+}

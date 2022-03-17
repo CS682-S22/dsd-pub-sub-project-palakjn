@@ -89,6 +89,22 @@ public class PacketHandler {
     }
 
     /**
+     * Create the entire packet with the seqNum: header + body
+     * @return byte array
+     */
+    public static byte[] createPacket(Constants.REQUESTER requester, Constants.TYPE type, Object object, int seqNum) {
+        byte[] packet = null;
+        byte[] body = object.toByte();
+
+        if (body != null) {
+            byte[] header = createHeader(requester, type, seqNum);
+            packet = ByteBuffer.allocate(4 + header.length + body.length).putInt(header.length).put(header).put(body).array();
+        }
+
+        return packet;
+    }
+
+    /**
      * Get the header part from the message
      * @param message the received message from the host
      * @return Decoded Header
