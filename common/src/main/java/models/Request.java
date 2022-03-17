@@ -7,11 +7,19 @@ public class Request extends Object {
     private int type; //Topic or Partition
     private String topicName;
     private int partition;
+    private int offset;
 
     public Request(int type, String topicName, int partition) {
         this.type = type;
         this.topicName = topicName;
         this.partition = partition;
+    }
+
+    public Request(int type, String topicName, int partition, int offset) {
+        this.type = type;
+        this.topicName = topicName;
+        this.partition = partition;
+        this.offset = offset;
     }
 
     public Request() {}
@@ -26,6 +34,10 @@ public class Request extends Object {
 
     public int getPartition() {
         return partition;
+    }
+
+    public int getOffset() {
+        return offset;
     }
 
     public boolean isValid() {

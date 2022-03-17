@@ -9,7 +9,7 @@ import java.util.List;
 public class Segment {
     private int segment;
     private byte[] buffer;
-    private List<Long> offsets;
+    private List<Integer> offsets;
     private String location;
     private int numOfLogs;
     private FileManager fileManager;
@@ -25,12 +25,24 @@ public class Segment {
         return segment;
     }
 
-    public void addOffset(long offset) {
+    public void addOffset(int offset) {
         offsets.add(offset);
     }
 
-    public boolean isOffsetExist(long offset) {
+    public boolean isOffsetExist(int offset) {
         return offsets.contains(offset);
+    }
+
+    public int getOffsetIndex(int offset) {
+        return offsets.indexOf(offset);
+    }
+
+    public int getNumOfOffsets() {
+        return offsets.size();
+    }
+
+    public int getOffset(int index) {
+        return offsets.get(index);
     }
 
     public void write(byte[] data) {
