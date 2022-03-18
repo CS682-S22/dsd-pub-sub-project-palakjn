@@ -22,7 +22,6 @@ public class RequestHandler {
         int curSeq = 0;
 
         while (running) {
-            logger.debug("Waiting for request");
             byte[] request = connection.receive();
 
             if (request != null) {

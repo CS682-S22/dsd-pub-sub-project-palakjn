@@ -22,12 +22,14 @@ public class Client {
     protected Host loadBalancer;
     protected Connection connection;
     protected HostService hostService;
+    protected String hostName;
 
     public Client(Logger logger, Properties properties) {
         this.logger = logger;
 
         String brokerInfo = properties.getValue(Constants.PROPERTY_KEY.BROKER);
         String loadBalancerInfo = properties.getValue(Constants.PROPERTY_KEY.LOADBALANCER);
+        hostName = properties.getValue(Constants.PROPERTY_KEY.HOST_NAME);
 
         broker = getHostInfo(brokerInfo);
         loadBalancer = getHostInfo(loadBalancerInfo);
@@ -42,9 +44,9 @@ public class Client {
         if (partition != null && partition.getBroker() != null && partition.getBroker().isValid()) {
             broker = partition.getBroker();
             isSuccess = true;
-            logger.info(String.format("Received broker information: %s:%d which is holding the information of topic %s - partition %d.", broker.getAddress(), broker.getPort(), topic, partitionNum));
+            logger.info(String.format("[%s] Received broker information: %s:%d which is holding the information of topic %s - partition %d.", hostName, broker.getAddress(), broker.getPort(), topic, partitionNum));
         } else {
-            logger.warn(String.format("No broker information found which is holding the information of topic %s - partition %d.",  topic, partitionNum));
+            logger.warn(String.format("[%s] No broker information found which is holding the information of topic %s - partition %d.", hostName, topic, partitionNum));
         }
 
         return isSuccess;
@@ -55,7 +57,7 @@ public class Client {
 
         try {
             Socket socket = new Socket(loadBalancer.getAddress(), loadBalancer.getPort());
-            logger.info(String.format("[%s:%d] Successfully connected to the destination.", loadBalancer.getAddress(), loadBalancer.getPort()));
+            logger.info(String.format("[%s] [%s:%d] Successfully connected to the destination.", hostName, loadBalancer.getAddress(), loadBalancer.getPort()));
 
             Connection connection = new Connection(socket, loadBalancer.getAddress(), loadBalancer.getPort());
             if (connection.openConnection()) {
@@ -67,7 +69,7 @@ public class Client {
 
                 while (running) {
                     if (timer.isTimeout()) {
-                        logger.warn(String.format("[%s:%d] Time-out happen for the REQ packet to the host. Re-sending the packet.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                        logger.warn(String.format("[%s] [%s:%d] Time-out happen for the REQ packet to the host. Re-sending the packet.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort()));
                         connection.send(packet);
                         timer.stopTimer();
                         timer.startTimer(Constants.TYPE.REQ.name(), Constants.RTT);
@@ -79,7 +81,7 @@ public class Client {
 
                             if (header != null) {
                                 if (header.getType() == Constants.TYPE.RESP.getValue()) {
-                                    logger.info(String.format("[%s:%d] Received the response for the REQ request from the host.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                                    logger.info(String.format("[%s] [%s:%d] Received the response for the REQ request from the host.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort()));
                                     timer.stopTimer();
 
                                     byte[] body = PacketHandler.getData(responseBytes);
@@ -88,12 +90,12 @@ public class Client {
                                         running = false;
                                         partition = JSONDesrializer.fromJson(body, Partition.class);
                                     } else {
-                                        logger.warn(String.format("[%s:%d] Received empty body from the load balancer. Retrying.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                                        logger.warn(String.format("[%s] [%s:%d] Received empty body from the load balancer. Retrying.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort()));
                                         connection.send(packet);
                                         timer.startTimer(Constants.TYPE.REQ.name(), Constants.RTT);
                                     }
                                 } else if (header.getType() == Constants.TYPE.NACK.getValue()) {
-                                    logger.warn(String.format("[%s:%d] Received negative acknowledgment for the REQ request from the host. Not retrying.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                                    logger.warn(String.format("[%s] [%s:%d] Received negative acknowledgment for the REQ request from the host. Not retrying.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort()));
                                     timer.stopTimer();
                                     running = false;
                                 }

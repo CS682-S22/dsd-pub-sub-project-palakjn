@@ -59,17 +59,15 @@ public class Application {
             System.out.println("No configuration found.");
         } else if (config.getLoadBalancer() == null || !config.getLoadBalancer().isValid()) {
             System.out.println("Need load balancer ip address and host.");
-        } else if (config.isCreateTopic() && (config.getTopics() == null ||
-                                              config.getTopics().size() == 0 ||
+        } else if (config.isCreateTopic() && (config.getTopicsToCreate() == null ||
+                                              config.getTopicsToCreate().size() == 0 ||
                                               config.isConsumer() ||
                                               config.isProducer())) {
             System.out.println("Invalid topic information found in the config");
         } else if (config.isProducer() && config.isConsumer()) {
             System.out.println("Node can't be both producer/consumer. Provide correct information.");
-        } else if ((config.isProducer() || config.isConsumer()) && (Strings.isNullOrEmpty(config.getLocation()) ||
-                                                                    Strings.isNullOrEmpty(config.getTopicName()) ||
-                                                                    config.getKey() < 0)) {
-            System.out.println("No logs details found");
+        } else if ((config.isProducer() || config.isConsumer()) && (config.getTopics() == null || config.getTopics().size() == 0)) {
+            System.out.println("No producer/consumer details found");
         } else {
             flag = true;
         }

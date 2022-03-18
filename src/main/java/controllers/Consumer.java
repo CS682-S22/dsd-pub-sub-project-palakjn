@@ -55,9 +55,9 @@ public class Consumer extends Client {
             threadPool.execute(this::receive);
             flag = true;
 
-            logger.info(String.format("[%s] Successfully subscribed to the topic: %s - Partition %d.", method.name(), topic, key));
+            logger.info(String.format("[%s] [%s] Successfully subscribed to the topic: %s - Partition %d.", hostName, method.name(), topic, key));
         } else {
-            logger.warn(String.format("[%s:%d] Either broker details not found or not able to connect to the broker. Not able to get the data of the topic %s - Partition %d.", broker == null ? null : broker.getAddress(), broker == null ? 0 : broker.getPort(), topic, key));
+            logger.warn(String.format("[%s] [%s:%d] Either broker details not found or not able to connect to the broker. Not able to get the data of the topic %s - Partition %d.", hostName, broker == null ? null : broker.getAddress(), broker == null ? 0 : broker.getPort(), topic, key));
         }
 
         return flag;
@@ -69,7 +69,7 @@ public class Consumer extends Client {
         try {
             data = queue.poll(milliseconds, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
-            logger.error("Unable to get the data from the queue");
+            logger.error(String.format("[%s] Unable to get the data from the queue", hostName), e);
         }
 
         return data;
@@ -86,18 +86,18 @@ public class Consumer extends Client {
                     byte[] data = AppPacketHandler.getData(packet);
 
                     if (data != null) {
-                        logger.debug(String.format("[%s:%d] Received the data from the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                        logger.debug(String.format("[%s] [%s:%d] Received the data from the broker.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort()));
 
                         try {
                             queue.put(data);
                         } catch (InterruptedException e) {
-                            logger.error("Fail to add items to the queue", e);
+                            logger.error(String.format("[%s] Fail to add items to the queue", hostName), e);
                         }
                     } else {
-                        logger.warn("No data found from the received packet. Ignored");
+                        logger.warn(String.format("[%s] No data found from the received packet. Ignored", hostName));
                     }
                 } else {
-                    logger.warn("Invalid header received from the broker. Ignored");
+                    logger.warn(String.format("[%s] Invalid header received from the broker. Ignored", hostName));
                 }
             }
         }

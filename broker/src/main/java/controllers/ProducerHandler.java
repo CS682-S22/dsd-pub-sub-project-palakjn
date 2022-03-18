@@ -57,7 +57,6 @@ public class ProducerHandler {
         boolean reading = true;
 
         while (reading) {
-            logger.debug("Waiting for new data");
             byte[] message = connection.receive();
 
             if (message != null) {

@@ -1,8 +1,6 @@
 package controllers;
 
-import configuration.Constants;
 import configurations.AppConstants;
-import models.Partition;
 import models.Properties;
 import org.apache.logging.log4j.LogManager;
 import utilities.AppPacketHandler;
@@ -35,7 +33,7 @@ public class Producer extends Client {
 
                 threadPool.execute(this::send);
             } else {
-                logger.warn(String.format("[%s:%d] Either broker details not found or not able to connect to the broker. Not able to send the data of the topic %s - Partition %d.", broker == null ? null : broker.getAddress(), broker == null ? 0 : broker.getPort(), topic, key));
+                logger.warn(String.format("[%s:%d] [%s] Either broker details not found or not able to connect to the broker. Not able to send the data of the topic %s - Partition %d.", broker == null ? null : broker.getAddress(), broker == null ? 0 : broker.getPort(), hostName, topic, key));
                 return;
             }
         }
@@ -44,7 +42,7 @@ public class Producer extends Client {
         try {
             queue.put(dataPacket);
         } catch (InterruptedException e) {
-            logger.error("Unable to add an item to the queue", e);
+            logger.error(String.format("[%s] Unable to add an item to the queue", hostName), e);
         }
     }
 
@@ -52,13 +50,11 @@ public class Producer extends Client {
         while (running) {
             try {
                 byte[] data = queue.take();
-                if (connection.send(data)) {
-                    logger.info(String.format("[%s:%d] Send the data to the broker", broker.getAddress(), broker.getPort()));
-                } else {
-                    logger.warn(String.format("[%s:%d] Not able to send the data to the broker", broker.getAddress(), broker.getPort()));
+                if (!connection.send(data)) {
+                    logger.warn(String.format("[%s:%d] [%s] Not able to send the data to the broker", broker.getAddress(), broker.getPort(), hostName));
                 }
             } catch (InterruptedException e) {
-                logger.error("Interrupted while getting data to post to the broker", e);
+                logger.error(String.format("[%s] Interrupted while getting data to post to the broker", hostName), e);
             }
         }
     }

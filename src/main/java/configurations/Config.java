@@ -1,6 +1,7 @@
 package configurations;
 
 import models.Host;
+import models.Partition;
 import models.Topic;
 
 import java.util.List;
@@ -9,11 +10,9 @@ public class Config {
     private Host loadBalancer;
     private boolean createTopic;
     private List<Topic> topicsToCreate;
-    private String topicName;
-    private int key;
     private boolean isProducer;
     private boolean isConsumer;
-    private String location;
+    private List<TopicConfig> topics;
 
     public Host getLoadBalancer() {
         return loadBalancer;
@@ -23,16 +22,12 @@ public class Config {
         return createTopic;
     }
 
-    public List<Topic> getTopics() {
+    public List<Topic> getTopicsToCreate() {
         return topicsToCreate;
     }
 
-    public String getTopicName() {
-        return topicName;
-    }
-
-    public int getKey() {
-        return key;
+    public List<TopicConfig> getTopics() {
+        return topics;
     }
 
     public boolean isProducer() {
@@ -41,9 +36,5 @@ public class Config {
 
     public boolean isConsumer() {
         return isConsumer;
-    }
-
-    public String getLocation() {
-        return location;
     }
 }

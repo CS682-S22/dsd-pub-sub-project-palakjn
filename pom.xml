@@ -15,8 +15,6 @@
 
     <modules>
         <module>broker</module>
-        <module>producer</module>
-        <module>consumer</module>
         <module>loadBalancer</module>
         <module>common</module>
     </modules>
