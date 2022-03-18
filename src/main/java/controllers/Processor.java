@@ -1,5 +1,6 @@
 package controllers;
 
+import configuration.Constants;
 import configurations.AppConstants;
 import configurations.Config;
 import models.Header;
@@ -10,9 +11,7 @@ import org.apache.logging.log4j.Logger;
 import utilities.AppPacketHandler;
 import utilities.NodeTimer;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -25,6 +24,8 @@ public class Processor {
             createTopics(config);
         } else if (config.isProducer()) {
             produce(config);
+        } else if (config.isConsumer()) {
+            consume(config);
         }
     }
 
@@ -103,7 +104,34 @@ public class Processor {
         } catch (IOException exception) {
             logger.error(String.format("Unable to open the file at the location %s.", config.getLocation()), exception);
         }
+    }
 
-        //producer.close();
+    private void consume(Config config) {
+        Properties properties = new Properties();
+        properties.put(AppConstants.PROPERTY_KEY.LOADBALANCER, String.format("%s:%d", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort()));
+        properties.put(AppConstants.PROPERTY_KEY.METHOD, AppConstants.METHOD.PULL.name());
+        properties.put(AppConstants.PROPERTY_KEY.OFFSET, "0");
+
+        Consumer consumer = new Consumer(properties);
+
+        //Subscribing to the topic
+        if (consumer.subscribe(config.getTopicName(), config.getKey())) {
+            String fileLocation = String.format("%s/%s_%d.log", config.getLocation(), config.getTopicName(), config.getKey());
+
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileLocation, true))) {
+                while (true) {
+                    byte[] data = consumer.poll(AppConstants.WAIT_TIME);
+
+                    if (data != null) {
+                        String string = new String(data);
+                        writer.write(string);
+                        writer.newLine();
+                        writer.flush();
+                    }
+                }
+            } catch (IOException exception) {
+                logger.error(String.format("Unable to open/create the file at the location %s.", fileLocation), exception);
+            }
+        }
     }
 }

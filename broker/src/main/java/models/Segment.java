@@ -13,12 +13,14 @@ public class Segment {
     private String location;
     private int numOfLogs;
     private FileManager fileManager;
+    private int availableSize; //Will hold size of the current segment + sum of the size of previous segments
 
-    public Segment(String parentLocation, int segment) {
+    public Segment(String parentLocation, int segment, int availableSize) {
         this.segment = segment;
         this.offsets = new ArrayList<>();
         this.location = String.format("%s/%d.log", parentLocation, segment);
         this.fileManager = new FileManager();
+        this.availableSize = availableSize;
     }
 
     public int getSegment() {
@@ -52,6 +54,7 @@ public class Segment {
             buffer = ByteBuffer.allocate(buffer.length + data.length).put(buffer).put(data).array();
         }
 
+        availableSize += data.length;
         numOfLogs++;
     }
 
@@ -74,5 +77,9 @@ public class Segment {
 
     public String getLocation() {
         return location;
+    }
+
+    public int getAvailableSize() {
+        return availableSize;
     }
 }

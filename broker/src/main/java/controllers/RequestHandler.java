@@ -45,6 +45,9 @@ public class RequestHandler {
                     running = false;
                 } else if (header.getRequester() == BrokerConstants.REQUESTER.CONSUMER.getValue()) {
                     logger.info("Received request from Consumer.");
+                    ConsumerHandler consumerHandler = new ConsumerHandler(connection);
+                    consumerHandler.processRequest(header, request);
+                    running = false;
                 }
             } else {
                 running = false;

@@ -1,5 +1,6 @@
 package controllers;
 
+import configuration.Constants;
 import configurations.BrokerConstants;
 import models.File;
 import models.Header;
@@ -31,6 +32,8 @@ public class ConsumerHandler {
             if (header.getType() == BrokerConstants.TYPE.ADD.getValue()) {
                 //Get the consumer detail and add it as the subscribers
             } else if (header.getType() == BrokerConstants.TYPE.PULL.getValue()) {
+                logger.info(String.format("[%s:%d] Received pull request from the consumer.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                hostService.sendACK(connection, BrokerConstants.REQUESTER.CONSUMER, header.getSeqNum());
                 //Pull request
                 processPullRequest(body);
             }
@@ -41,12 +44,14 @@ public class ConsumerHandler {
         Request request = JSONDesrializer.fromJson(body, Request.class);
 
         if (request != null && request.isValid()) {
+            logger.debug(String.format("[%s:%d] Received request to get the data of topic %s - partition %d - offset - %d", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getTopicName(), request.getPartition(), request.getOffset()));
             if (CacheManager.isExist(request.getTopicName(), request.getPartition())) {
                 File partition = CacheManager.getPartition(request.getTopicName(), request.getPartition());
 
                 //Checking if we have the message with the given offset
                 int segmentNumber = partition.getSegmentNumber(request.getOffset());
                 if (segmentNumber != -1) {
+                    logger.debug(String.format("[%s:%d] Segment %d holding information of %d offset", connection.getDestinationIPAddress(), connection.getDestinationPort(), segmentNumber, request.getOffset()));
                     send(partition, segmentNumber, request.getOffset());
                 } else {
                     logger.warn(String.format("[%s:%d] No offset %d found for the topic %s - partition %d information.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getOffset(), request.getTopicName(), request.getPartition()));
@@ -68,7 +73,6 @@ public class ConsumerHandler {
         for (Segment segment : segments) {
             try (FileInputStream stream = new FileInputStream(segment.getLocation())) {
                 int index = 0;
-                int size = stream.available();
 
                 if (segment.getSegment() == segmentNumber) {
                     //Getting the index of the offset which contains the starting offset
@@ -80,13 +84,13 @@ public class ConsumerHandler {
                     if (index + 1 < segment.getNumOfOffsets()) {
                         length = segment.getOffset(index + 1) - segment.getOffset(index);
                     } else {
-                        length = size - segment.getOffset(index);
+                        length = segment.getAvailableSize() - segment.getOffset(index);
                     }
 
                     byte[] data = new byte[length];
-                    int result = stream.read(data, segment.getOffset(index), length);
+                    int result = stream.read(data, 0, length);
                     if(result == length) {
-                        connection.send(data);
+                        connection.send(BrokerPacketHandler.createDataPacket(data));
                         logger.debug(String.format("Send %d number of bytes to the consumer.", result));
                     } else {
                         logger.warn(String.format("Not able to send data. Read %d number of bytes. Expected %d number of bytes.", result, length));
@@ -94,7 +98,7 @@ public class ConsumerHandler {
 
                     index++;
                 }
-            } catch (IOException ioException) {
+            } catch (IndexOutOfBoundsException | IOException ioException) {
                 logger.error(String.format("Unable to open the segment file at the location %s.", segment.getLocation()), ioException);
             }
         }

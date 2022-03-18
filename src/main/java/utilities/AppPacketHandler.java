@@ -35,7 +35,6 @@ public class AppPacketHandler extends PacketHandler {
     }
 
     public static byte[] createDataPacket(byte[] data) {
-        byte[] header = createHeader(AppConstants.REQUESTER.PRODUCER, AppConstants.TYPE.DATA);
-        return ByteBuffer.allocate(4 + header.length + data.length).putInt(header.length).put(header).put(data).array();
+        return createDataPacket(AppConstants.REQUESTER.PRODUCER, data);
     }
 }

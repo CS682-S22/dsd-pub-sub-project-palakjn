@@ -30,7 +30,7 @@ public class File {
 
     public boolean initialize(String parentLocation, String topic, int partition) {
         this.parentLocation = String.format("%s/%s/%d", parentLocation, topic, partition);
-        segment = new Segment(this.parentLocation, 0);
+        segment = new Segment(this.parentLocation, 0, 0);
 
         return fileManager.createDirectory(parentLocation, String.format("%s/%d", topic, partition));
     }
@@ -89,10 +89,8 @@ public class File {
         List<Segment> segments = new ArrayList<>();
         lock.readLock().lock();
 
-        if (segmentNumber > 0) {
-            for (int i = segmentNumber; i < this.segments.size(); i++) {
-                segments.add(this.segments.get(i));
-            }
+        for (int i = segmentNumber; i < this.segments.size(); i++) {
+            segments.add(this.segments.get(i));
         }
 
         lock.readLock().unlock();
@@ -115,7 +113,7 @@ public class File {
                 logger.warn(String.format("Fail while flushing segment %d to the disk. Data in the segment is lost and not available to read", segment.getSegment()));
             }
 
-            segment = new Segment(parentLocation, segmentsToRead);
+            segment = new Segment(parentLocation, segmentsToRead, totalSize);
 
             isFlushed = true;
         }

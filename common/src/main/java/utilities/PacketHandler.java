@@ -104,6 +104,11 @@ public class PacketHandler {
         return packet;
     }
 
+    public static byte[] createDataPacket(Constants.REQUESTER requester, byte[] data) {
+        byte[] header = createHeader(requester, Constants.TYPE.DATA);
+        return ByteBuffer.allocate(4 + header.length + data.length).putInt(header.length).put(header).put(data).array();
+    }
+
     /**
      * Get the header part from the message
      * @param message the received message from the host

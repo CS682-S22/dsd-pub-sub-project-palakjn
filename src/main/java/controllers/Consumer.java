@@ -2,6 +2,7 @@ package controllers;
 
 import configuration.Constants;
 import configurations.AppConstants;
+import models.Header;
 import models.Properties;
 import org.apache.logging.log4j.LogManager;
 import utilities.AppPacketHandler;
@@ -75,15 +76,29 @@ public class Consumer extends Client {
     }
 
     public void receive() {
-        byte[] data = connection.receive();
+        while (true) {
+            byte[] packet = connection.receive();
 
-        if (data != null) {
-            logger.debug(String.format("[%s:%d] Received the data from the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+            if (packet != null) {
+                Header.Content header = AppPacketHandler.getHeader(packet);
 
-            try {
-                queue.put(data);
-            } catch (InterruptedException e) {
-                logger.error("Fail to add items to the queue", e);
+                if (header != null && header.getType() == AppConstants.TYPE.DATA.getValue()) {
+                    byte[] data = AppPacketHandler.getData(packet);
+
+                    if (data != null) {
+                        logger.debug(String.format("[%s:%d] Received the data from the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+
+                        try {
+                            queue.put(data);
+                        } catch (InterruptedException e) {
+                            logger.error("Fail to add items to the queue", e);
+                        }
+                    } else {
+                        logger.warn("No data found from the received packet. Ignored");
+                    }
+                } else {
+                    logger.warn("Invalid header received from the broker. Ignored");
+                }
             }
         }
     }

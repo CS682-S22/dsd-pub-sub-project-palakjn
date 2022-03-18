@@ -18,4 +18,8 @@ public class BrokerPacketHandler extends PacketHandler {
 
         return packet;
     }
+
+    public static byte[] createDataPacket(byte[] data) {
+        return createDataPacket(BrokerConstants.REQUESTER.PRODUCER, data);
+    }
 }
