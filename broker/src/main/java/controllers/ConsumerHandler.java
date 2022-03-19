@@ -1,6 +1,5 @@
 package controllers;
 
-import configuration.Constants;
 import configurations.BrokerConstants;
 import models.File;
 import models.Header;
@@ -36,6 +35,9 @@ public class ConsumerHandler {
                 hostService.sendACK(connection, BrokerConstants.REQUESTER.CONSUMER, header.getSeqNum());
                 //Pull request
                 processPullRequest(body);
+
+                //Closing the connection after sending data
+                connection.closeConnection();
             }
         }
     }
@@ -80,18 +82,26 @@ public class ConsumerHandler {
                 }
 
                 while (index < segment.getNumOfOffsets()) {
-                    int length = 0;
+                    int length;
+                    int nextOffset;
+
                     if (index + 1 < segment.getNumOfOffsets()) {
                         length = segment.getOffset(index + 1) - segment.getOffset(index);
+                        nextOffset = segment.getOffset(index + 1);
                     } else {
                         length = segment.getAvailableSize() - segment.getOffset(index);
+                        nextOffset = segment.getAvailableSize();
                     }
 
                     byte[] data = new byte[length];
                     int result = stream.read(data, 0, length);
                     if(result == length) {
-                        connection.send(BrokerPacketHandler.createDataPacket(data));
-                        logger.debug(String.format("Send %d number of bytes to the consumer.", result));
+                        if(connection.send(BrokerPacketHandler.createDataPacket(data, nextOffset))) {
+                            logger.debug(String.format("Send %d number of bytes to the consumer. Next offset is %d", result, nextOffset));
+                        } else if (!connection.isOpen()) {
+                            logger.warn("Connection is closed by the consumer.");
+                            break;
+                        }
                     } else {
                         logger.warn(String.format("Not able to send data. Read %d number of bytes. Expected %d number of bytes.", result, length));
                     }

@@ -38,6 +38,16 @@ public class PacketHandler {
     }
 
     /**
+     * Create the header part of the packet
+     * @param requester the type of the node
+     * @param type the type of the packet
+     * @return byte array
+     */
+    public static byte[] createHeaderWithOffset(Constants.REQUESTER requester, Constants.TYPE type, int offset) {
+        return Header.Content.newBuilder().setRequester(requester.getValue()).setType(type.getValue()).setOffset(offset).build().toByteArray();
+    }
+
+    /**
      * Creates an acknowledgement packet for the file chunk with the given sequence number
      * @param requester the type of the requester: BROKER, LOADBALANCER, etc
      * @param seqNum Sequence number of the file whose acknowledgement we are sending

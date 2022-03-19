@@ -35,6 +35,12 @@ public final class Header {
      * @return The seqNum.
      */
     int getSeqNum();
+
+    /**
+     * <code>int32 offset = 4;</code>
+     * @return The offset.
+     */
+    int getOffset();
   }
   /**
    * Protobuf type {@code Content}
@@ -94,6 +100,11 @@ public final class Header {
             case 24: {
 
               seqNum_ = input.readInt32();
+              break;
+            }
+            case 32: {
+
+              offset_ = input.readInt32();
               break;
             }
             default: {
@@ -161,6 +172,17 @@ public final class Header {
       return seqNum_;
     }
 
+    public static final int OFFSET_FIELD_NUMBER = 4;
+    private int offset_;
+    /**
+     * <code>int32 offset = 4;</code>
+     * @return The offset.
+     */
+    @java.lang.Override
+    public int getOffset() {
+      return offset_;
+    }
+
     private byte memoizedIsInitialized = -1;
     @java.lang.Override
     public final boolean isInitialized() {
@@ -184,6 +206,9 @@ public final class Header {
       if (seqNum_ != 0) {
         output.writeInt32(3, seqNum_);
       }
+      if (offset_ != 0) {
+        output.writeInt32(4, offset_);
+      }
       unknownFields.writeTo(output);
     }
 
@@ -204,6 +229,10 @@ public final class Header {
       if (seqNum_ != 0) {
         size += com.google.protobuf.CodedOutputStream
           .computeInt32Size(3, seqNum_);
+      }
+      if (offset_ != 0) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeInt32Size(4, offset_);
       }
       size += unknownFields.getSerializedSize();
       memoizedSize = size;
@@ -226,6 +255,8 @@ public final class Header {
           != other.getType()) return false;
       if (getSeqNum()
           != other.getSeqNum()) return false;
+      if (getOffset()
+          != other.getOffset()) return false;
       if (!unknownFields.equals(other.unknownFields)) return false;
       return true;
     }
@@ -243,6 +274,8 @@ public final class Header {
       hash = (53 * hash) + getType();
       hash = (37 * hash) + SEQNUM_FIELD_NUMBER;
       hash = (53 * hash) + getSeqNum();
+      hash = (37 * hash) + OFFSET_FIELD_NUMBER;
+      hash = (53 * hash) + getOffset();
       hash = (29 * hash) + unknownFields.hashCode();
       memoizedHashCode = hash;
       return hash;
@@ -382,6 +415,8 @@ public final class Header {
 
         seqNum_ = 0;
 
+        offset_ = 0;
+
         return this;
       }
 
@@ -411,6 +446,7 @@ public final class Header {
         result.requester_ = requester_;
         result.type_ = type_;
         result.seqNum_ = seqNum_;
+        result.offset_ = offset_;
         onBuilt();
         return result;
       }
@@ -467,6 +503,9 @@ public final class Header {
         }
         if (other.getSeqNum() != 0) {
           setSeqNum(other.getSeqNum());
+        }
+        if (other.getOffset() != 0) {
+          setOffset(other.getOffset());
         }
         this.mergeUnknownFields(other.unknownFields);
         onChanged();
@@ -589,6 +628,37 @@ public final class Header {
         onChanged();
         return this;
       }
+
+      private int offset_ ;
+      /**
+       * <code>int32 offset = 4;</code>
+       * @return The offset.
+       */
+      @java.lang.Override
+      public int getOffset() {
+        return offset_;
+      }
+      /**
+       * <code>int32 offset = 4;</code>
+       * @param value The offset to set.
+       * @return This builder for chaining.
+       */
+      public Builder setOffset(int value) {
+        
+        offset_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>int32 offset = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearOffset() {
+        
+        offset_ = 0;
+        onChanged();
+        return this;
+      }
       @java.lang.Override
       public final Builder setUnknownFields(
           final com.google.protobuf.UnknownFieldSet unknownFields) {
@@ -656,9 +726,9 @@ public final class Header {
       descriptor;
   static {
     java.lang.String[] descriptorData = {
-      "\n\014Header.proto\":\n\007Content\022\021\n\trequester\030\001" +
-      " \001(\005\022\014\n\004type\030\002 \001(\005\022\016\n\006seqNum\030\003 \001(\005B\020\n\006mo" +
-      "delsB\006Headerb\006proto3"
+      "\n\014Header.proto\"J\n\007Content\022\021\n\trequester\030\001" +
+      " \001(\005\022\014\n\004type\030\002 \001(\005\022\016\n\006seqNum\030\003 \001(\005\022\016\n\006of" +
+      "fset\030\004 \001(\005B\020\n\006modelsB\006Headerb\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -669,7 +739,7 @@ public final class Header {
     internal_static_Content_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_Content_descriptor,
-        new java.lang.String[] { "Requester", "Type", "SeqNum", });
+        new java.lang.String[] { "Requester", "Type", "SeqNum", "Offset", });
   }
 
   // @@protoc_insertion_point(outer_class_scope)

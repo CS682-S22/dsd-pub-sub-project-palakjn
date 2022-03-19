@@ -19,7 +19,15 @@ public class BrokerPacketHandler extends PacketHandler {
         return packet;
     }
 
-    public static byte[] createDataPacket(byte[] data) {
-        return createDataPacket(BrokerConstants.REQUESTER.PRODUCER, data);
+    public static byte[] createDataPacket(byte[] data, int offset) {
+        byte[] packet = null;
+        byte[] body = data;
+
+        if (body != null) {
+            byte[] header = createHeaderWithOffset(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.DATA, offset);
+            packet = ByteBuffer.allocate(4 + header.length + body.length).putInt(header.length).put(header).put(body).array();
+        }
+
+        return packet;
     }
 }

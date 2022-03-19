@@ -6,6 +6,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 
 /**
  * Responsible for sending and receiving data from the channel being established between two hosts.
@@ -115,6 +116,14 @@ public class Connection implements Sender, Receiver {
         return isSend;
     }
 
+    public void setTimeOut(int timeOut) {
+        try {
+            channel.setSoTimeout(timeOut);
+        } catch (SocketException e) {
+            System.err.println("Unable to set the timer. Error:" + e);
+        }
+    }
+
     /**
      * Receive message from another host.
      * @return the message being received
@@ -133,7 +142,8 @@ public class Connection implements Sender, Receiver {
         catch (SocketException exception) {
             //If getting socket exception means connection is refused or cancelled. In this case, will not attempt to make any operation
             isClosed = true;
-        } catch (IOException exception) {
+        } catch (SocketTimeoutException exception) {}
+        catch (IOException exception) {
             System.err.printf("[%s:%d] Fail to receive message from %s:%d. Error: %s.\n", sourceIPAddress, sourcePort, destinationIPAddress, destinationPort, exception.getMessage());
         }
 

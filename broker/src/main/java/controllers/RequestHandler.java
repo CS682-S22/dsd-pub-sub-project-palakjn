@@ -21,7 +21,7 @@ public class RequestHandler {
         boolean running = true;
         int curSeq = 0;
 
-        while (running) {
+        while (running && connection.isOpen()) {
             byte[] request = connection.receive();
 
             if (request != null) {

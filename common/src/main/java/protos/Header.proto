@@ -7,4 +7,5 @@ message Content {
   int32 requester = 1;
   int32 type = 2;
   int32 seqNum = 3;
+  int32 offset = 4;
 }
