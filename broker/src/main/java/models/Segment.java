@@ -35,6 +35,19 @@ public class Segment {
         return offsets.contains(offset);
     }
 
+    public int getRoundUpOffset(int initialOffset) {
+        int roundUpOffset = -1;
+
+        for (int offset : offsets) {
+            if (initialOffset <= offset) {
+                roundUpOffset = offset;
+                break;
+            }
+        }
+
+        return roundUpOffset;
+    }
+
     public int getOffsetIndex(int offset) {
         return offsets.indexOf(offset);
     }

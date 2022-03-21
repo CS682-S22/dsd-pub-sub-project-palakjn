@@ -140,7 +140,7 @@ public class Consumer extends Client {
                         logger.warn(String.format("[%s] No data found from the received packet. Ignored", hostName));
                     }
                 } else if (header.getType() == Constants.TYPE.NACK.getValue()) {
-                    logger.warn(String.format("[%s] Offset %d not exist in the broker . Ignored", hostName));
+                    logger.warn(String.format("[%s] Offset %d not exist in the broker . Ignored", hostName, offset));
             } else
                 logger.warn(String.format("[%s] Invalid header received from the broker. Ignored", hostName));
             }

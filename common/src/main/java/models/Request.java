@@ -40,6 +40,10 @@ public class Request extends Object {
         return offset;
     }
 
+    public void setOffset(int offset) {
+        this.offset = offset;
+    }
+
     public boolean isValid() {
         return Constants.findRequestByValue(type) != null && !Strings.isNullOrEmpty(topicName);
     }

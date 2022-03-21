@@ -73,7 +73,7 @@ public class File {
 
         if (offset < availableSize) {
             for (Segment seg : segments) {
-                if (seg.isOffsetExist(offset)) {
+                if (offset < seg.getAvailableSize() && seg.isOffsetExist(offset)) {
                     segmentNumber = seg.getSegment();
                     break;
                 }
@@ -81,8 +81,26 @@ public class File {
         }
 
         lock.readLock().unlock();
-
         return segmentNumber;
+    }
+
+    public int getRoundUpOffset(int offset) {
+        lock.readLock().lock();
+        int roundUpOffset = -1;
+
+        if (offset < availableSize) {
+            for (Segment segment : segments) {
+                if (offset < segment.getAvailableSize()) {
+                    roundUpOffset = segment.getRoundUpOffset(offset);
+
+                    if (roundUpOffset != -1) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        return roundUpOffset;
     }
 
     public List<Segment> getSegmentsFrom(int segmentNumber) {

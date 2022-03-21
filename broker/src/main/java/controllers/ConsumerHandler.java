@@ -28,9 +28,7 @@ public class ConsumerHandler {
         byte[] body = BrokerPacketHandler.getData(message);
 
         if (body != null) {
-            if (header.getType() == BrokerConstants.TYPE.ADD.getValue()) {
-                //Get the consumer detail and add it as the subscribers
-            } else if (header.getType() == BrokerConstants.TYPE.PULL.getValue()) {
+             if (header.getType() == BrokerConstants.TYPE.PULL.getValue()) {
                 logger.info(String.format("[%s:%d] Received pull request from the consumer.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
                 hostService.sendACK(connection, BrokerConstants.REQUESTER.CONSUMER, header.getSeqNum());
                 //Pull request
@@ -50,14 +48,27 @@ public class ConsumerHandler {
             if (CacheManager.isExist(request.getTopicName(), request.getPartition())) {
                 File partition = CacheManager.getPartition(request.getTopicName(), request.getPartition());
 
-                //Checking if we have the message with the given offset
-                int segmentNumber = partition.getSegmentNumber(request.getOffset());
-                if (segmentNumber != -1) {
-                    logger.debug(String.format("[%s:%d] Segment %d holding information of %d offset", connection.getDestinationIPAddress(), connection.getDestinationPort(), segmentNumber, request.getOffset()));
-                    send(partition, segmentNumber, request.getOffset());
-                } else {
-                    logger.warn(String.format("[%s:%d] No offset %d found for the topic %s - partition %d information.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getOffset(), request.getTopicName(), request.getPartition()));
-                    hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER);
+                boolean toSend = true;
+
+                while (toSend) {
+                    //Getting the segment number which is holding the exact offset
+                    int segmentNumber = partition.getSegmentNumber(request.getOffset());
+                    if (segmentNumber != -1) {
+                        logger.debug(String.format("[%s:%d] Segment %d holding information of %d offset", connection.getDestinationIPAddress(), connection.getDestinationPort(), segmentNumber, request.getOffset()));
+                        send(partition, segmentNumber, request.getOffset());
+                        toSend = false;
+                    } else {
+                        //Exact offset not found. Getting the offset which is more than the given offset.
+                        int roundUpOffset = partition.getRoundUpOffset(request.getOffset());
+                        if (roundUpOffset != -1) {
+                            logger.debug(String.format("[%s:%d] Broker don't have exact offset %d. Sending information from %d offset instead", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getOffset(), roundUpOffset));
+                            request.setOffset(roundUpOffset);
+                        } else {
+                            logger.warn(String.format("[%s:%d] No offset %d found for the topic %s - partition %d information.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getOffset(), request.getTopicName(), request.getPartition()));
+                            hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER);
+                            toSend = false;
+                        }
+                    }
                 }
             } else {
                 logger.warn(String.format("[%s:%d] Broker not holding topic %s - partition %d information.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getTopicName(), request.getPartition()));

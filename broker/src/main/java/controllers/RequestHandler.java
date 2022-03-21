@@ -10,7 +10,6 @@ public class RequestHandler {
     private static final Logger logger = LogManager.getLogger(RequestHandler.class);
     private HostService hostService;
     private Connection connection;
-    private int curSeq = 0;
 
     public RequestHandler(Connection connection) {
         this.connection = connection;
