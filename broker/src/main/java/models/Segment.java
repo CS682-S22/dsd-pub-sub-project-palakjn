@@ -39,8 +39,9 @@ public class Segment {
         int roundUpOffset = -1;
 
         for (int offset : offsets) {
-            if (initialOffset <= offset) {
+            if (initialOffset >= offset) {
                 roundUpOffset = offset;
+            } else {
                 break;
             }
         }

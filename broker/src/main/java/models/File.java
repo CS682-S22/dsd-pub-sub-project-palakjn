@@ -100,6 +100,7 @@ public class File {
             }
         }
 
+        lock.readLock().unlock();
         return roundUpOffset;
     }
 

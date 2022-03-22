@@ -1,3 +1,5 @@
+import configuration.Constants;
+import configurations.AppConstants;
 import configurations.Config;
 import controllers.Processor;
 import utilities.JSONDesrializer;
@@ -68,6 +70,8 @@ public class Application {
             System.out.println("Node can't be both producer/consumer. Provide correct information.");
         } else if ((config.isProducer() || config.isConsumer()) && (config.getTopics() == null || config.getTopics().size() == 0)) {
             System.out.println("No producer/consumer details found");
+        } else if (config.isConsumer() && !(config.getMethod() == AppConstants.METHOD.PULL.getValue() || config.getMethod() == AppConstants.METHOD.PUSH.getValue())) {
+            System.out.println("Wrong method provided for Consumer.(Accepted method: 0 for PULL & 1 for PUSH)");
         } else {
             flag = true;
         }

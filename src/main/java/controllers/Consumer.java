@@ -59,11 +59,16 @@ public class Consumer extends Client {
             this.topic = topic;
             this.key = key;
             isConnected = true;
-            timer.startTimer("CONSUMER TIMER", AppConstants.CONSUMER_WAIT_TIME);
-            threadPool.execute(this::receive);
             flag = true;
 
             logger.info(String.format("[%s] [%s] Successfully subscribed to the topic: %s - Partition %d.", hostName, method.name(), topic, key));
+
+            if (method == AppConstants.METHOD.PULL) {
+                timer.startTimer("CONSUMER PULL TIMER", AppConstants.CONSUMER_WAIT_TIME);
+                threadPool.execute(this::processPULL);
+            } else {
+                threadPool.execute(this::processPUSH);
+            }
         } else {
             logger.warn(String.format("[%s] [%s:%d] Either broker details not found or not able to connect to the broker. Not able to get the data of the topic %s - Partition %d.", hostName, broker == null ? null : broker.getAddress(), broker == null ? 0 : broker.getPort(), topic, key));
         }
@@ -83,7 +88,7 @@ public class Consumer extends Client {
         return data;
     }
 
-    public void receive() {
+    private void processPULL() {
         while (isConnected && connection.isOpen()) {
             if (timer.isTimeout()) {
                 logger.debug(String.format("[%s] Timeout happen. Will try to receive data for %d amount of time else will re-send the packet.", hostName, AppConstants.CONSUMER_WAIT_TIME));
@@ -107,7 +112,7 @@ public class Consumer extends Client {
                 logger.info(String.format("[%s] Sending PULL request to broker to get topic %s:%d information from offset %d", hostName, topic, key, offset));
                 byte[] request = AppPacketHandler.createToBrokerRequest(AppConstants.REQUESTER.CONSUMER, AppConstants.TYPE.PULL, topic, key, offset);
                 if (connectToBroker(request, AppConstants.TYPE.PULL.name())) {
-                    timer.startTimer("CONSUMER TIMER", AppConstants.CONSUMER_WAIT_TIME);
+                    timer.startTimer("CONSUMER PULL TIMER", AppConstants.CONSUMER_WAIT_TIME);
                 } else {
                     logger.warn(String.format("[%s] Not able to connect to the broker to get topic %s:%d offset: %d information", hostName, topic, key, offset));
                     isConnected = true;
@@ -116,6 +121,14 @@ public class Consumer extends Client {
                 byte[] data = connection.receive();
                 processData(data);
             }
+        }
+    }
+
+    private void processPUSH() {
+        while (isConnected && connection.isOpen()) {
+            byte[] data = connection.receive();
+
+            processData(data);
         }
     }
 
@@ -128,21 +141,28 @@ public class Consumer extends Client {
                     byte[] data = AppPacketHandler.getData(packet);
 
                     if (data != null) {
-                        logger.debug(String.format("[%s] [%s:%d] Received the data from the broker with the offset as %d.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getOffset()));
+                        if (method == AppConstants.METHOD.PULL) {
+                            logger.debug(String.format("[%s] [%s:%d] [PULL] Received the data from the broker with the offset as %d.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getOffset()));
+                        } else {
+                            logger.debug(String.format("[%s] [%s:%d] [PUSH] Received the data from the broker.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                        }
 
                         try {
                             queue.put(data);
-                            offset = header.getOffset();
+
+                            if (method == AppConstants.METHOD.PULL) {
+                                offset = header.getOffset();
+                            }
                         } catch (InterruptedException e) {
-                            logger.error(String.format("[%s] Fail to add items to the queue", hostName), e);
+                            logger.error(String.format("[%s] [%s] Fail to add items to the queue", hostName, method.name()), e);
                         }
                     } else {
-                        logger.warn(String.format("[%s] No data found from the received packet. Ignored", hostName));
+                        logger.warn(String.format("[%s] [%s] No data found from the received packet. Ignored", hostName, method.name()));
                     }
                 } else if (header.getType() == Constants.TYPE.NACK.getValue()) {
-                    logger.warn(String.format("[%s] Offset %d not exist in the broker . Ignored", hostName, offset));
+                    logger.warn(String.format("[%s] [%s] Offset %d not exist in the broker . Ignored", hostName, method.name(), offset));
             } else
-                logger.warn(String.format("[%s] Invalid header received from the broker. Ignored", hostName));
+                logger.warn(String.format("[%s] [%s] Invalid header received from the broker. Ignored", hostName, method.name()));
             }
         }
     }

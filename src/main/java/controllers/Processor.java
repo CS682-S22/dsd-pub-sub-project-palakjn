@@ -1,10 +1,10 @@
 package controllers;
 
+import configuration.Constants;
 import configurations.AppConstants;
 import configurations.Config;
 import configurations.TopicConfig;
 import models.Header;
-import models.Host;
 import models.Properties;
 import models.Topic;
 import org.apache.logging.log4j.LogManager;
@@ -33,11 +33,9 @@ public class Processor {
             for (TopicConfig topicConfig : config.getTopics()) {
                 if (topicConfig.isValid()) {
                     if (config.isProducer()) {
-                        String name = String.format("Producer%d", index);
-                        threadPool.execute(() -> produce(config.getLoadBalancer(), topicConfig, name));
+                        threadPool.execute(() -> produce(config, topicConfig));
                     } else {
-                        String name = String.format("Consumer%d", index);
-                        threadPool.execute(() -> consume(config.getLoadBalancer(), topicConfig, name));
+                        threadPool.execute(() -> consume(config, topicConfig));
                     }
                 }
 
@@ -105,48 +103,55 @@ public class Processor {
         }
     }
 
-    private void produce(Host loadBalancer, TopicConfig config, String name) {
-        logger.info(String.format("Started %s", name));
+    private void produce(Config config, TopicConfig topicConfig) {
+        String hostName = String.format("Producer - %s", config.getHostName());
+        logger.info(String.format("Started %s", hostName));
 
         Properties properties = new Properties();
-        properties.put(AppConstants.PROPERTY_KEY.LOADBALANCER, String.format("%s:%d", loadBalancer.getAddress(), loadBalancer.getPort()));
+        properties.put(AppConstants.PROPERTY_KEY.LOADBALANCER, String.format("%s:%d", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort()));
         //Below is optional. For logging purpose.
-        properties.put(AppConstants.PROPERTY_KEY.HOST_NAME, name);
+        properties.put(AppConstants.PROPERTY_KEY.HOST_NAME, hostName);
 
         Producer producer = new Producer(properties);
 
         int count = 0; //For logging purpose
-        try (BufferedReader reader = new BufferedReader(new FileReader(config.getLocation()))) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(topicConfig.getLocation()))) {
             String line = reader.readLine();
 
             while (line != null) {
-                producer.send(config.getName(), config.getKey(), line.getBytes(StandardCharsets.UTF_8));
+                producer.send(topicConfig.getName(), topicConfig.getKey(), line.getBytes(StandardCharsets.UTF_8));
                 line = reader.readLine();
 
                 count++;
             }
 
-            logger.info(String.format("[%s] Send %d number of data for topic %s - partition %d", name, count, config.getName(), config.getKey()));
+            logger.info(String.format("[%s] Send %d number of data for topic %s - partition %d", hostName, count, topicConfig.getName(), topicConfig.getKey()));
         } catch (IOException exception) {
-            logger.error(String.format("[%s] Unable to open the file at the location %s.", name, config.getLocation()), exception);
+            logger.error(String.format("[%s] Unable to open the file at the location %s.", hostName, topicConfig.getLocation()), exception);
         }
     }
 
-    private void consume(Host loadBalancer, TopicConfig config, String name) {
-        logger.info(String.format("Started %s", name));
+    private void consume(Config config, TopicConfig topicConfig) {
+        String hostName = String.format("Consumer - %s", config.getHostName());
+        logger.info(String.format("Started %s", hostName));
+
+        String method = AppConstants.METHOD.PULL.name();
+        if (config.getMethod() == Constants.METHOD.PUSH.getValue()) {
+            method = AppConstants.METHOD.PUSH.name();
+        }
 
         Properties properties = new Properties();
-        properties.put(AppConstants.PROPERTY_KEY.LOADBALANCER, String.format("%s:%d", loadBalancer.getAddress(), loadBalancer.getPort()));
-        properties.put(AppConstants.PROPERTY_KEY.METHOD, AppConstants.METHOD.PULL.name());
-        properties.put(AppConstants.PROPERTY_KEY.OFFSET, config.getOffset());
+        properties.put(AppConstants.PROPERTY_KEY.LOADBALANCER, String.format("%s:%d", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort()));
+        properties.put(AppConstants.PROPERTY_KEY.METHOD, method);
+        properties.put(AppConstants.PROPERTY_KEY.OFFSET, topicConfig.getOffset());
         //Below is optional. For logging purpose.
-        properties.put(AppConstants.PROPERTY_KEY.HOST_NAME, name);
+        properties.put(AppConstants.PROPERTY_KEY.HOST_NAME, hostName);
 
         Consumer consumer = new Consumer(properties);
 
         //Subscribing to the topic
-        if (consumer.subscribe(config.getName(), config.getKey())) {
-            String fileLocation = String.format("%s/%s_%d.log", config.getLocation(), config.getName(), config.getKey());
+        if (consumer.subscribe(topicConfig.getName(), topicConfig.getKey())) {
+            String fileLocation = String.format("%s/%s_%d.log", topicConfig.getLocation(), topicConfig.getName(), topicConfig.getKey());
 
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileLocation, true))) {
                 while (true) {
@@ -160,7 +165,7 @@ public class Processor {
                     }
                 }
             } catch (IOException exception) {
-                logger.error(String.format("[%s] Unable to open/create the file at the location %s.", name, fileLocation), exception);
+                logger.error(String.format("[%s] Unable to open/create the file at the location %s.", hostName, fileLocation), exception);
             }
         }
     }

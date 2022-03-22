@@ -50,7 +50,10 @@ public class Producer extends Client {
         while (running) {
             try {
                 byte[] data = queue.take();
-                if (!connection.send(data)) {
+
+                if (connection.send(data)) {
+                    logger.warn(String.format("[%s:%d] [%s] Send %d number of bytes to the broker", broker.getAddress(), broker.getPort(), hostName, data.length));
+                } else {
                     logger.warn(String.format("[%s:%d] [%s] Not able to send the data to the broker", broker.getAddress(), broker.getPort(), hostName));
                 }
             } catch (InterruptedException e) {

@@ -45,6 +45,19 @@ public class Constants {
         }
     }
 
+    public static TYPE findTypeByValue(int value) {
+        TYPE result = null;
+
+        for (TYPE type : TYPE.values()) {
+            if (type.getValue() == value) {
+                result = type;
+                break;
+            }
+        }
+
+        return result;
+    }
+
     public enum REQUEST {
         TOPIC(0),
         PARTITION(1);
@@ -87,5 +100,30 @@ public class Constants {
         public int getValue() {
             return value;
         }
+    }
+
+    public enum METHOD {
+        PULL(0),
+        PUSH(1);
+
+        private final int value;
+        METHOD(int value) {
+            this.value = value;
+        }
+
+        public int getValue() {
+            return value;
+        }
+    }
+
+    public static METHOD findMethodByName(String name) {
+        METHOD result = null;
+        for (METHOD method : METHOD.values()) {
+            if (method.name().equalsIgnoreCase(name)) {
+                result = method;
+                break;
+            }
+        }
+        return result;
     }
 }

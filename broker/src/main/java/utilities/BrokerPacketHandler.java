@@ -30,4 +30,16 @@ public class BrokerPacketHandler extends PacketHandler {
 
         return packet;
     }
+
+    public static byte[] createDataPacket(byte[] data) {
+        byte[] packet = null;
+        byte[] body = data;
+
+        if (body != null) {
+            byte[] header = createHeader(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.DATA);
+            packet = ByteBuffer.allocate(4 + header.length + body.length).putInt(header.length).put(header).put(body).array();
+        }
+
+        return packet;
+    }
 }

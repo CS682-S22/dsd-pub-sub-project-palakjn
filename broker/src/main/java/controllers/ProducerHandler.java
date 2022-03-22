@@ -28,7 +28,7 @@ public class ProducerHandler {
                 Request request = JSONDesrializer.fromJson(body, Request.class);
 
                 if (request != null && request.isValid()) {
-                    logger.info(String.format("[%s:%d] Received request to add the logs for the topic %s - partition %d from the producer.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getTopicName(), request.getPartition()));
+                    logger.info(String.format("[%s:%d] Received request to add the logs for the topic %s - partition %d from the producer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), request.getTopicName(), request.getPartition(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
 
                     if (CacheManager.isExist(request.getTopicName(), request.getPartition())) {
                         hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
@@ -36,19 +36,19 @@ public class ProducerHandler {
                         File file = CacheManager.getPartition(request.getTopicName(), request.getPartition());
                         receive(file);
                     } else {
-                        logger.warn(String.format("[%s:%d] Current broker not holding any topic %s - partition %d. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getTopicName(), request.getPartition()));
+                        logger.warn(String.format("[%s:%d] Current broker %s:%d not holding any topic %s - partition %d. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), connection.getSourceIPAddress(), connection.getSourcePort(), request.getTopicName(), request.getPartition()));
                         hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                     }
                 } else {
-                    logger.warn(String.format("[%s:%d] Received invalid request information from the producer. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                    logger.warn(String.format("[%s:%d] Received invalid request information from the producer %s:%d. Sending NACK", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
                     hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                 }
             } else {
-                logger.warn(String.format("[%s:%d] Received empty request body from the producer. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                logger.warn(String.format("[%s:%d] Received empty request body from the producer %s:%d. Sending NACK.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
                 hostService.sendNACK(connection, Constants.REQUESTER.BROKER, header.getSeqNum());
             }
         } else {
-            logger.warn(String.format("[%s:%d] Received unsupported action %d from the producer. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getType()));
+            logger.warn(String.format("[%s:%d] Received unsupported action %d from the producer %s:%d. Sending NACK", connection.getSourceIPAddress(), connection.getSourcePort(), header.getType(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
             hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
         }
     }
@@ -67,25 +67,39 @@ public class ProducerHandler {
                         byte[] data = BrokerPacketHandler.getData(message);
 
                         if (data != null) {
-                            logger.info(String.format("[%s:%d] Received data from producer. Writing to the segment.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
                             partition.write(data);
+                            logger.info(String.format("[%s:%d] Received data from producer %s:%d. Written to the segment.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
+
+                            //Sending to all the subscribers
+                            sendToSubscribers(data);
                         } else {
-                            logger.warn(String.format("[%s:%d] Received empty data from producer.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                            logger.warn(String.format("[%s:%d] Received empty data from producer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
                         }
                     } else if (header.getType() == BrokerConstants.TYPE.ADD.getValue()) {
-                        logger.info(String.format("[%s:%d] Received ADD request from producer again. Sending ACK as ACK might have lost before.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                        logger.info(String.format("[%s:%d] Received ADD request from producer %s:%d again. Sending ACK as ACK might have lost before.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
                         hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                     } else if (header.getType() == BrokerConstants.TYPE.FIN.getValue()) {
-                        logger.info(String.format("[%s:%d] Received FIN from producer. Not reading anymore from the channel.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                        logger.info(String.format("[%s:%d] Received FIN from producer %s:%d. Not reading anymore from the channel.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
                         reading = false;
                     }
                 } else {
-                    logger.warn(String.format("[%s:%d] Received invalid packet from the producer.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                    logger.warn(String.format("[%s:%d] Received invalid packet from the producer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
                 }
             } else {
-                logger.warn(String.format("[%s:%d] Channel might have closed by producer. Not reading further from the channel.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                logger.warn(String.format("[%s:%d] Channel might have closed by producer %s:%d. Not reading further from the channel.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
                 reading = false;
             }
+        }
+    }
+
+    private void sendToSubscribers(byte[] data) {
+        int numOfSubscribers = CacheManager.getSubscribersCount();
+
+        for (int index = 0; index < numOfSubscribers; index++) {
+            Subscriber subscriber = CacheManager.getSubscriber(index);
+
+            subscriber.onEvent(data);
+            logger.info(String.format("[%s:%d] Send data to the subscriber: %s.", connection.getSourceIPAddress(), connection.getSourcePort(), subscriber.getAddress()));
         }
     }
 }

@@ -1,7 +1,6 @@
 package configurations;
 
 import models.Host;
-import models.Partition;
 import models.Topic;
 
 import java.util.List;
@@ -13,6 +12,8 @@ public class Config {
     private boolean isProducer;
     private boolean isConsumer;
     private List<TopicConfig> topics;
+    private int method;
+    private String hostName;
 
     public Host getLoadBalancer() {
         return loadBalancer;
@@ -36,5 +37,13 @@ public class Config {
 
     public boolean isConsumer() {
         return isConsumer;
+    }
+
+    public int getMethod() {
+        return method;
+    }
+
+    public String getHostName() {
+        return hostName;
     }
 }
