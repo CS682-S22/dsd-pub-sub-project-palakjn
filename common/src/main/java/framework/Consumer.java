@@ -127,9 +127,10 @@ public class Consumer extends Client {
         byte[] request = PacketHandler.createToBrokerRequest(Constants.REQUESTER.CONSUMER, Constants.TYPE.PULL, topic, key, offset, Constants.CONSUMER_MAX_PULL_SIZE);
         if (connectToBroker(request, Constants.TYPE.PULL.name())) {
             timer.startTimer("CONSUMER PULL TIMER", Constants.CONSUMER_WAIT_TIME);
+            isConnected = true;
         } else {
             logger.warn(String.format("[%s] Not able to connect to the broker to get topic %s:%d offset: %d information", hostName, topic, key, offset));
-            isConnected = true;
+            isConnected = false;
         }
     }
 

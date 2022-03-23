@@ -140,43 +140,50 @@ public class RequestHandler {
 
             if (topic != null && topic.isValid() && topic.getNumOfPartitions() > 0) {
                 if (action == Constants.TYPE.ADD.getValue()) {
-                    if (CacheManager.isTopicExist(topic.getName())) {
-                        logger.warn(String.format("[%s:%d] Topic with the name %s already exist. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
-                        hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
-                    } else {
-                        logger.debug(String.format("[%s:%d] Request received for distributing %d number of partitions of topic %s among %d number of brokers", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getNumOfPartitions(), topic.getName(), CacheManager.getNumberOfBrokers()));
-                        Topic newTopic = new Topic(topic.getName());
-
-                        for (int index = 0; index < topic.getNumOfPartitions(); index++) {
-                            Host broker = CacheManager.findBrokerWithLessLoad();
-                            Partition partition = new Partition(topic.getName(), index, broker);
-                            newTopic.addPartition(partition);
-
-                            //logging
-                            String log = String.format("[%s:%d] Broker %s:%d handling Topic %s - Partition %d.", connection.getDestinationIPAddress(), connection.getDestinationPort(), broker.getAddress(), broker.getPort(), topic.getName(), index);
-                            logger.info(log);
-                            System.out.println(log);
-                        }
-
-                        boolean flag = CacheManager.addTopic(newTopic);
-                        if (flag) {
-                            sendAck();
-                            logger.debug(String.format("[%s:%d] Created topic %s with %d number of partitions. Sending the information to the respective brokers.",connection.getDestinationIPAddress(), connection.getDestinationPort(), newTopic.getName(), newTopic.getNumOfPartitions()));
-
-                            //Send partition information to all the brokers asynchronously. Assuming that all the brokers might be up and running
-                            sendToBrokers(newTopic);
-                        } else {
-                            //Two requests for creating topic with same name might have received. Another thread might have added that topic before.
-                            logger.warn(String.format("[%s:%d] Another instance might have created same topic. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                            hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
-                        }
-                    }
+                    createTopic(topic);
                 } else {
                     logger.warn(String.format("[%s:%d] Received unsupported action %d for the topic related service. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), action));
                     hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
                 }
             } else {
                 logger.warn(String.format("[%s:%d] Received invalid requests to create the topic. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
+            }
+        }
+    }
+
+    private void createTopic(Topic topic) {
+        if (CacheManager.isTopicExist(topic.getName())) {
+            logger.warn(String.format("[%s:%d] Topic with the name %s already exist. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
+            hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
+        } else if (CacheManager.getNumberOfBrokers() == 0) {
+            logger.warn(String.format("[%s:%d] No brokers joined the network yet. Not able to create the topic with the name %s. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
+            hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
+        } else {
+            logger.debug(String.format("[%s:%d] Request received for distributing %d number of partitions of topic %s among %d number of brokers", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getNumOfPartitions(), topic.getName(), CacheManager.getNumberOfBrokers()));
+            Topic newTopic = new Topic(topic.getName());
+
+            for (int index = 0; index < topic.getNumOfPartitions(); index++) {
+                Host broker = CacheManager.findBrokerWithLessLoad();
+                Partition partition = new Partition(topic.getName(), index, broker);
+                newTopic.addPartition(partition);
+
+                //logging
+                String log = String.format("[%s:%d] Broker %s:%d handling Topic %s - Partition %d.", connection.getDestinationIPAddress(), connection.getDestinationPort(), broker.getAddress(), broker.getPort(), topic.getName(), index);
+                logger.info(log);
+                System.out.println(log);
+            }
+
+            boolean flag = CacheManager.addTopic(newTopic);
+            if (flag) {
+                sendAck();
+                logger.debug(String.format("[%s:%d] Created topic %s with %d number of partitions. Sending the information to the respective brokers.",connection.getDestinationIPAddress(), connection.getDestinationPort(), newTopic.getName(), newTopic.getNumOfPartitions()));
+
+                //Send partition information to all the brokers asynchronously. Assuming that all the brokers might be up and running
+                sendToBrokers(newTopic);
+            } else {
+                //Two requests for creating topic with same name might have received. Another thread might have added that topic before.
+                logger.warn(String.format("[%s:%d] Another instance might have created same topic. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort()));
                 hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
             }
         }
@@ -204,9 +211,13 @@ public class RequestHandler {
             if (connection.openConnection()) {
                 logger.debug(String.format("[%s:%d] Sending the the topic %s - Partitions {%s} information to the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getPartitionString()));
                 byte[] packet = LBPacketHandler.createPacket(Constants.TYPE.ADD, topic);
-                hostService.sendPacketWithACK(connection, packet, String.format("%s:%s", Constants.REQUESTER.LOAD_BALANCER.name(), Constants.TYPE.ADD.name()));
-                //TODO: If isSuccess == false then, remove the topic information from the cache
-                logger.info(String.format("[%s:%d] Send the topic %s - Partitions {%s} information to the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getPartitionString()));
+                boolean isSuccess = hostService.sendPacketWithACK(connection, packet, String.format("%s:%s", Constants.REQUESTER.LOAD_BALANCER.name(), Constants.TYPE.ADD.name()));
+                if (isSuccess) {
+                    logger.info(String.format("[%s:%d] Send the topic %s - Partitions {%s} information to the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getPartitionString()));
+                } else {
+                    //Removing topic information from the cache.
+                    CacheManager.removePartitions(topic);
+                }
             }
         } catch (IOException exception) {
             logger.error(String.format("[%s:%d] Fail to make connection with the broker in order to send the topic %s - Partitions {%s} information", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getPartitionString()), exception);

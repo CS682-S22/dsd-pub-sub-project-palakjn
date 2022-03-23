@@ -5,6 +5,7 @@ import models.Partition;
 import models.Topic;
 
 import java.util.*;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Static global cache alike class storing the configuration of the system.
@@ -17,94 +18,142 @@ public class CacheManager {
     private static Map<String, Partition> partitionMap = new HashMap<>();    // Map topic name + partition to the partition object. Useful when a customer wants to read from particular topic partition as well as when the producer wants to publish message
 
     //locks
-    private static final Object brokerLock = new Object();
-    private static final Object topicLock = new Object();
+    private static final ReentrantReadWriteLock brokerLock = new ReentrantReadWriteLock();
+    private static final ReentrantReadWriteLock topicLock = new ReentrantReadWriteLock();
 
     private CacheManager() {
     }
 
-    public static boolean isExist(Host broker) {
-        synchronized (brokerLock) {
-            return brokers.stream().anyMatch(host -> host.getAddress().equals(broker.getAddress()) && host.getPort() == broker.getPort());
-        }
-    }
-
     public static void addBroker(Host broker) {
-        synchronized (brokerLock) {
-            if (!isExist(broker)) {
-                brokers.add(broker);
-            }
-        }
-    }
+        brokerLock.writeLock().lock();
 
-    public static int getNumberOfBrokers() {
-        synchronized (brokerLock) {
-            return brokers.size();
+        if (!isExist(broker)) {
+            brokers.add(broker);
         }
+
+        brokerLock.writeLock().unlock();
     }
 
     public static void removeBroker(Host broker) {
-        synchronized (brokerLock) {
-            brokers.removeIf(host -> host.getAddress().equals(broker.getAddress()) && host.getPort() == broker.getPort());
-        }
+        brokerLock.writeLock().lock();
+        brokers.removeIf(host -> host.getAddress().equals(broker.getAddress()) && host.getPort() == broker.getPort());
+        brokerLock.writeLock().unlock();
     }
 
     public static Host findBrokerWithLessLoad() {
-        synchronized (brokerLock) {
-            Host broker = brokers.get(0);
-            int min = broker.getNumberOfPartitions();
+        Host broker;
+        brokerLock.writeLock().lock();
 
-            for (int index = 1; index < brokers.size(); index++) {
-                if (brokers.get(index).getNumberOfPartitions() < min) {
-                    broker = brokers.get(index);
-                    min = broker.getNumberOfPartitions();
-                }
+        broker = brokers.get(0);
+        int min = broker.getNumberOfPartitions();
+
+        for (int index = 1; index < brokers.size(); index++) {
+            if (brokers.get(index).getNumberOfPartitions() < min) {
+                broker = brokers.get(index);
+                min = broker.getNumberOfPartitions();
             }
-
-            broker.incrementNumOfPartitions();
-            return broker;
         }
+
+        broker.incrementNumOfPartitions();
+
+        brokerLock.writeLock().unlock();
+        return broker;
     }
 
-    public static boolean isTopicExist(String topic) {
-        synchronized (topicLock) {
-            return topicMap.containsKey(topic);
-        }
+    public static int getNumberOfBrokers() {
+        int size;
+        brokerLock.readLock().lock();
+
+        size = brokers.size();
+
+        brokerLock.readLock().unlock();
+        return size;
+    }
+
+    public static boolean isExist(Host broker) {
+        boolean flag;
+        brokerLock.readLock().lock();
+
+        flag = brokers.stream().anyMatch(host -> host.getAddress().equals(broker.getAddress()) && host.getPort() == broker.getPort());
+
+        brokerLock.readLock().unlock();
+        return flag;
     }
 
     public static boolean addTopic(Topic topic) {
-        synchronized (topicLock) {
-            boolean flag = false;
+        boolean flag = false;
+        topicLock.writeLock().lock();
 
-            if (!topicMap.containsKey(topic.getName())) {
-                topicMap.put(topic.getName(), topic);
+        if (!topicMap.containsKey(topic.getName())) {
+            topicMap.put(topic.getName(), topic);
 
-                for (Partition partition : topic.getPartitions()) {
-                    partitionMap.put(partition.getString(), partition);
-                }
-
-                flag = true;
+            for (Partition partition : topic.getPartitions()) {
+                partitionMap.put(partition.getString(), partition);
             }
 
-            return flag;
+            flag = true;
         }
+
+        topicLock.writeLock().unlock();
+        return flag;
+    }
+
+    public static void removePartitions(Topic topicToRemove) {
+        topicLock.writeLock().lock();
+
+        Topic topic = topicMap.get(topicToRemove.getName());
+
+        for (Partition partition : topicToRemove.getPartitions()) {
+            partitionMap.remove(String.format("%s:%s", partition.getTopicName(), partition.getNumber()));
+
+            topic.remove(partition.getNumber());
+        }
+
+        if (topic.getNumOfPartitions() == 0) {
+            //No partitions for the topic left. Remove topic reference itself.
+            topicMap.remove(topicToRemove.getName());
+        }
+
+        topicLock.writeLock().unlock();
+    }
+
+    public static boolean isTopicExist(String topic) {
+        boolean flag;
+        topicLock.readLock().lock();
+
+        flag = topicMap.containsKey(topic);
+
+        topicLock.readLock().unlock();
+        return flag;
     }
 
     public static Topic getTopic(String name) {
-        synchronized (topicLock) {
-            return topicMap.getOrDefault(name, null);
-        }
+        Topic topic;
+        topicLock.readLock().lock();
+
+        topic = topicMap.getOrDefault(name, null);
+
+        topicLock.readLock().unlock();
+        return topic;
     }
 
     public static Partition getPartition(String name, int partition) {
-        synchronized (topicLock) {
-            return partitionMap.getOrDefault(String.format("%s:%s", name, partition), null);
-        }
+        Partition part;
+        topicLock.readLock().lock();
+
+        part = partitionMap.getOrDefault(String.format("%s:%s", name, partition), null);
+
+        topicLock.readLock().unlock();
+        return part;
     }
 
     public static boolean isPartitionExist(String name, int partition) {
-        synchronized (topicLock) {
-            return partitionMap.containsKey(String.format("%s:%s", name, partition));
-        }
+        boolean flag;
+        topicLock.readLock().lock();
+
+        flag = partitionMap.containsKey(String.format("%s:%s", name, partition));
+
+        topicLock.readLock().unlock();
+        return flag;
     }
 }

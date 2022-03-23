@@ -55,6 +55,11 @@ public class Topic extends Object {
         return result;
     }
 
+    public void remove(int partNum) {
+        partitions.removeIf(partition -> partition.getNumber() == partNum);
+        numOfPartitions--;
+    }
+
     public String getPartitionString() {
         StringBuilder builder = new StringBuilder();
 

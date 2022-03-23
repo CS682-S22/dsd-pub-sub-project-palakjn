@@ -78,9 +78,6 @@ public class ProducerHandler {
                     } else if (header.getType() == BrokerConstants.TYPE.ADD.getValue()) {
                         logger.info(String.format("[%s:%d] Received ADD request from producer %s:%d again. Sending ACK as ACK might have lost before.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
                         hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
-                    } else if (header.getType() == BrokerConstants.TYPE.FIN.getValue()) {
-                        logger.info(String.format("[%s:%d] Received FIN from producer %s:%d. Not reading anymore from the channel.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                        reading = false;
                     }
                 } else {
                     logger.warn(String.format("[%s:%d] Received invalid packet from the producer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));

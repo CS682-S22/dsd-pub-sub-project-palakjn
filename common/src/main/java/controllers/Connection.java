@@ -138,12 +138,11 @@ public class Connection implements Sender, Receiver {
                 buffer = new byte[length];
                 inputStream.readFully(buffer, 0, buffer.length);
             }
-        } catch (EOFException ignored) {} //No more content available to read
+        } catch (EOFException | SocketTimeoutException ignored) {} //No more content available to read
         catch (SocketException exception) {
             //If getting socket exception means connection is refused or cancelled. In this case, will not attempt to make any operation
             isClosed = true;
-        } catch (SocketTimeoutException exception) {}
-        catch (IOException exception) {
+        } catch (IOException exception) {
             System.err.printf("[%s:%d] Fail to receive message from %s:%d. Error: %s.\n", sourceIPAddress, sourcePort, destinationIPAddress, destinationPort, exception.getMessage());
         }
 
