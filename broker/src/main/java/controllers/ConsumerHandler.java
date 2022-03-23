@@ -2,7 +2,10 @@ package controllers;
 
 import configuration.Constants;
 import configurations.BrokerConstants;
-import models.*;
+import models.File;
+import models.Header;
+import models.Request;
+import models.Segment;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import utilities.BrokerPacketHandler;
@@ -33,38 +36,80 @@ public class ConsumerHandler {
             } else {
                 Request request = JSONDesrializer.fromJson(body, Request.class);
 
-                if (request != null && request.isValid()) {
-                    logger.debug(String.format("[%s:%d] Received [%s] request to get the data of topic %s - partition %d - offset - %d from the consumer %s:%d", connection.getSourceIPAddress(), connection.getSourcePort(), BrokerConstants.findTypeByValue(header.getType()), request.getTopicName(), request.getPartition(), request.getOffset(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                if (validateRequest(header, request)) {
+                    if (header.getType() == BrokerConstants.TYPE.PULL.getValue()) {
+                        method = BrokerConstants.METHOD.PULL;
+                        processPullRequest(request);
 
-                    if (CacheManager.isExist(request.getTopicName(), request.getPartition())) {
-                        logger.warn(String.format("[%s:%d] [%s] Broker holding the topic %s - partition %d information.", connection.getSourceIPAddress(), connection.getSourcePort(), BrokerConstants.findTypeByValue(header.getType()), request.getTopicName(), request.getPartition()));
-                        hostService.sendACK(connection, BrokerConstants.REQUESTER.CONSUMER, header.getSeqNum());
-
-                        if (header.getType() == BrokerConstants.TYPE.ADD.getValue()) {
-
-                            //Adding subscriber
-                            subscriber = new Subscriber(connection);
-                            CacheManager.addSubscriber(subscriber);
-                        }
-
-                        setMethod(header);
-
-                        processRequest(request);
-
-                        if (header.getType() == BrokerConstants.TYPE.PULL.getValue()) {
-                            //Closing the connection after sending data
-                            connection.closeConnection();
-                        }
+                        connection.closeConnection();
                     } else {
-                        logger.warn(String.format("[%s:%d] Broker not holding the topic %s - partition %d information.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getTopicName(), request.getPartition()));
-                        hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER);
+                        //Adding subscriber
+                        subscriber = new Subscriber(connection);
+                        CacheManager.addSubscriber(subscriber);
+
+                        method = Constants.METHOD.PUSH;
+                        processRequest(request);
                     }
-                } else {
-                    logger.warn(String.format("[%s:%d] Received invalid request body from consumer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                    hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER);
                 }
             }
         }
+    }
+
+    private boolean validateRequest(Header.Content header, Request request) {
+        boolean isValid = false;
+
+        if (request != null && request.isValid()) {
+            logger.debug(String.format("[%s:%d] Received [%s] request to get the data of topic %s - partition %d - offset - %d from the consumer %s:%d", connection.getSourceIPAddress(), connection.getSourcePort(), BrokerConstants.findTypeByValue(header.getType()), request.getTopicName(), request.getPartition(), request.getOffset(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
+
+            if (CacheManager.isExist(request.getTopicName(), request.getPartition())) {
+                logger.warn(String.format("[%s:%d] [%s] Broker holding the topic %s - partition %d information.", connection.getSourceIPAddress(), connection.getSourcePort(), BrokerConstants.findTypeByValue(header.getType()), request.getTopicName(), request.getPartition()));
+                hostService.sendACK(connection, BrokerConstants.REQUESTER.CONSUMER, header.getSeqNum());
+
+                isValid = true;
+            } else {
+                logger.warn(String.format("[%s:%d] Broker not holding the topic %s - partition %d information.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getTopicName(), request.getPartition()));
+                hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER);
+            }
+        } else {
+            logger.warn(String.format("[%s:%d] Received invalid request body from consumer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
+            hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER);
+        }
+
+        return isValid;
+    }
+
+    private void processPullRequest(Request request) {
+        while (connection.isOpen()) {
+            processRequest(request);
+
+            request = receivePullRequest();
+        }
+    }
+
+    private Request receivePullRequest() {
+        Request request = null;
+
+        while (request == null) {
+            byte[] packet = connection.receive();
+
+            if (packet != null) {
+                Header.Content header = BrokerPacketHandler.getHeader(packet);
+
+                if (header != null && header.getRequester() == BrokerConstants.REQUESTER.CONSUMER.getValue() && header.getType() == BrokerConstants.TYPE.PULL.getValue()) {
+                    byte[] body = BrokerPacketHandler.getData(packet);
+
+                    if (body != null) {
+                        request = JSONDesrializer.fromJson(body, Request.class);
+
+                        if (!validateRequest(header, request)) {
+                            request = null;
+                        }
+                    }
+                }
+            }
+        }
+
+        return request;
     }
 
     private void processRequest(Request request) {
@@ -74,7 +119,7 @@ public class ConsumerHandler {
 
         if (segmentNumber != -1) {
             logger.debug(String.format("[%s:%d] [%s] Segment %d holding information of %d offset", connection.getDestinationIPAddress(), connection.getDestinationPort(), method.name(), segmentNumber, request.getOffset()));
-            sendPartition(partition, segmentNumber, request.getOffset());
+            sendPartition(request, partition, segmentNumber);
         } else {
             hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER);
         }
@@ -99,49 +144,46 @@ public class ConsumerHandler {
         return segmentNumber;
     }
 
-    private void sendPartition(File partition, int segmentNumber, int offset) {
+    private void sendPartition(Request request, File partition, int segmentNumber) {
         List<Segment> segments = partition.getSegmentsFrom(segmentNumber);
+        int count = 0;
 
         for (Segment segment : segments) {
-            int index = 0;
+            int offsetIndex = 0;
 
             if (segment.getSegment() == segmentNumber) {
                 //Getting the index of the offset which contains the starting offset
-                index = segment.getOffsetIndex(offset);
+                offsetIndex = segment.getOffsetIndex(request.getOffset());
             }
 
-            sendSegment(segment, index);
-
-            if (!connection.isOpen()) {
-                break;
+            while (offsetIndex < segment.getNumOfOffsets() && (method == BrokerConstants.METHOD.PUSH || (method == BrokerConstants.METHOD.PULL && count < request.getNumOfMsg()))) {
+                sendSegment(segment, offsetIndex);
+                count++;
+                offsetIndex++;
             }
         }
     }
 
-    private void sendSegment(Segment segment, int index) {
+    private void sendSegment(Segment segment, int offsetIndex) {
         try (FileInputStream stream = new FileInputStream(segment.getLocation())) {
-            while (index < segment.getNumOfOffsets() && connection.isOpen()) {
-                int length;
-                int nextOffset;
+            int length;
+            int nextOffset;
 
-                if (index + 1 < segment.getNumOfOffsets()) {
-                    length = segment.getOffset(index + 1) - segment.getOffset(index);
-                    nextOffset = segment.getOffset(index + 1);
-                } else {
-                    length = segment.getAvailableSize() - segment.getOffset(index);
-                    nextOffset = segment.getAvailableSize();
-                }
+            if (offsetIndex + 1 < segment.getNumOfOffsets()) {
+                length = segment.getOffset(offsetIndex + 1) - segment.getOffset(offsetIndex);
+                nextOffset = segment.getOffset(offsetIndex + 1);
+            } else {
+                length = segment.getAvailableSize() - segment.getOffset(offsetIndex);
+                nextOffset = segment.getAvailableSize();
+            }
 
-                byte[] data = new byte[length];
-                int result = stream.read(data, 0, length);
-                if(result == length) {
-                    send(data, nextOffset);
-                    logger.info(String.format("[%s:%d] [%s] Send %d number of bytes to the consumer %s:%d", connection.getSourceIPAddress(), connection.getSourcePort(), method.name(), data.length, connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                } else {
-                    logger.warn(String.format("[%s] Not able to send data. Read %d number of bytes. Expected %d number of bytes.", method.name(), result, length));
-                }
-
-                index++;
+            byte[] data = new byte[length];
+            int result = stream.read(data, 0, length);
+            if(result == length) {
+                send(data, nextOffset);
+                logger.info(String.format("[%s:%d] [%s] Send %d number of bytes to the consumer %s:%d", connection.getSourceIPAddress(), connection.getSourcePort(), method.name(), data.length, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+            } else {
+                logger.warn(String.format("[%s] Not able to send data. Read %d number of bytes. Expected %d number of bytes.", method.name(), result, length));
             }
         } catch (IndexOutOfBoundsException | IOException ioException) {
             logger.error(String.format("Unable to open the segment file at the location %s.", segment.getLocation()), ioException);
@@ -153,14 +195,6 @@ public class ConsumerHandler {
             connection.send(BrokerPacketHandler.createDataPacket(data, nextOffset));
         } else {
             subscriber.onEvent(data);
-        }
-    }
-
-    private void setMethod(Header.Content header) {
-        if (header.getType() == BrokerConstants.TYPE.PULL.getValue()) {
-            method = BrokerConstants.METHOD.PULL;
-        } else {
-            method = Constants.METHOD.PUSH;
         }
     }
 }

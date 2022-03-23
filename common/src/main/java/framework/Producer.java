@@ -1,9 +1,10 @@
-package controllers;
+package framework;
 
-import configurations.AppConstants;
+import configuration.Constants;
+import controllers.Client;
 import models.Properties;
 import org.apache.logging.log4j.LogManager;
-import utilities.AppPacketHandler;
+import utilities.PacketHandler;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -16,19 +17,19 @@ public class Producer extends Client {
     private volatile boolean running = true;
 
     public Producer(Properties properties) {
-        super(LogManager.getLogger(Producer.class), properties);
+        super(LogManager.getLogger("producer"), properties);
 
-        queue = new LinkedBlockingDeque<>(AppConstants.QUEUE_BUFFER_SIZE);
-        this.threadPool = Executors.newFixedThreadPool(AppConstants.THREAD_COUNT);
+        queue = new LinkedBlockingDeque<>(Constants.QUEUE_BUFFER_SIZE);
+        this.threadPool = Executors.newFixedThreadPool(Constants.THREAD_COUNT);
     }
 
     public void send(String topic, int key, byte[] data) {
         if (!isConnected) {
-            byte[] lbPacket = AppPacketHandler.createGetBrokerReq(AppConstants.REQUESTER.PRODUCER, topic, key);
-            byte[] brokerRequest = AppPacketHandler.createToBrokerRequest(AppConstants.REQUESTER.PRODUCER, AppConstants.TYPE.ADD, topic, key);
+            byte[] lbPacket = PacketHandler.createGetBrokerReq(Constants.REQUESTER.PRODUCER, topic, key);
+            byte[] brokerRequest = PacketHandler.createToBrokerRequest(Constants.REQUESTER.PRODUCER, Constants.TYPE.ADD, topic, key);
 
             if ((broker != null ||
-                    getBroker(lbPacket, topic, key)) && connectToBroker(brokerRequest, AppConstants.TYPE.ADD.name())) {
+                    getBroker(lbPacket, topic, key)) && connectToBroker(brokerRequest, Constants.TYPE.ADD.name())) {
                 isConnected = true;
 
                 threadPool.execute(this::send);
@@ -38,7 +39,7 @@ public class Producer extends Client {
             }
         }
 
-        byte[] dataPacket = AppPacketHandler.createDataPacket(data);
+        byte[] dataPacket = PacketHandler.createDataPacket(data);
         try {
             queue.put(dataPacket);
         } catch (InterruptedException e) {

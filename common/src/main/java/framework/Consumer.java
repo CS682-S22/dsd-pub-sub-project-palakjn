@@ -1,12 +1,12 @@
-package controllers;
+package framework;
 
 import configuration.Constants;
-import configurations.AppConstants;
+import controllers.Client;
 import models.Header;
 import models.Properties;
 import org.apache.logging.log4j.LogManager;
-import utilities.AppPacketHandler;
 import utilities.NodeTimer;
+import utilities.PacketHandler;
 import utilities.Strings;
 
 import java.util.concurrent.*;
@@ -15,16 +15,16 @@ public class Consumer extends Client {
     private BlockingQueue<byte[]> queue;
     private ExecutorService threadPool;
     private int offset;
-    private AppConstants.METHOD method;
+    private Constants.METHOD method;
     private NodeTimer timer;
     private String topic;
     private int key;
 
     public Consumer(Properties properties) {
-        super(LogManager.getLogger(Consumer.class), properties);
+        super(LogManager.getLogger("consumer"), properties);
 
-        queue = new LinkedBlockingDeque<>(AppConstants.QUEUE_BUFFER_SIZE);
-        this.threadPool = Executors.newFixedThreadPool(AppConstants.THREAD_COUNT);
+        queue = new LinkedBlockingDeque<>(Constants.QUEUE_BUFFER_SIZE);
+        this.threadPool = Executors.newFixedThreadPool(Constants.THREAD_COUNT);
 
         String offset = properties.getValue(Constants.PROPERTY_KEY.OFFSET);
         if (!Strings.isNullOrEmpty(offset) && isNumeric(offset)) {
@@ -33,11 +33,11 @@ public class Consumer extends Client {
 
         String method = properties.getValue(Constants.PROPERTY_KEY.METHOD);
         if (!Strings.isNullOrEmpty(method)) {
-            this.method = AppConstants.findMethodByName(method);
+            this.method = Constants.findMethodByName(method);
         }
 
         if (this.method == null) {
-            this.method = AppConstants.METHOD.PULL; //By default
+            this.method = Constants.METHOD.PULL; //By default
         }
 
         timer = new NodeTimer();
@@ -45,13 +45,13 @@ public class Consumer extends Client {
 
     public boolean subscribe(String topic, int key) {
         boolean flag = false;
-        byte[] lbPacket = AppPacketHandler.createGetBrokerReq(AppConstants.REQUESTER.CONSUMER, topic, key);
+        byte[] lbPacket = PacketHandler.createGetBrokerReq(Constants.REQUESTER.CONSUMER, topic, key);
         byte[] brokerRequest;
 
-        if (method == AppConstants.METHOD.PULL) {
-            brokerRequest = AppPacketHandler.createToBrokerRequest(AppConstants.REQUESTER.CONSUMER, AppConstants.TYPE.PULL, topic, key, offset);
+        if (method == Constants.METHOD.PULL) {
+            brokerRequest = PacketHandler.createToBrokerRequest(Constants.REQUESTER.CONSUMER, Constants.TYPE.PULL, topic, key, offset, Constants.CONSUMER_MAX_PULL_SIZE);
         } else { //POST
-            brokerRequest = AppPacketHandler.createToBrokerRequest(AppConstants.REQUESTER.CONSUMER, AppConstants.TYPE.ADD, topic, key, offset);
+            brokerRequest = PacketHandler.createToBrokerRequest(Constants.REQUESTER.CONSUMER, Constants.TYPE.ADD, topic, key, offset);
         }
 
         if ((broker != null ||
@@ -63,8 +63,8 @@ public class Consumer extends Client {
 
             logger.info(String.format("[%s] [%s] Successfully subscribed to the topic: %s - Partition %d.", hostName, method.name(), topic, key));
 
-            if (method == AppConstants.METHOD.PULL) {
-                timer.startTimer("CONSUMER PULL TIMER", AppConstants.CONSUMER_WAIT_TIME);
+            if (method == Constants.METHOD.PULL) {
+                timer.startTimer("CONSUMER PULL TIMER", Constants.CONSUMER_WAIT_TIME);
                 threadPool.execute(this::processPULL);
             } else {
                 threadPool.execute(this::processPUSH);
@@ -89,37 +89,28 @@ public class Consumer extends Client {
     }
 
     private void processPULL() {
+        int count = 0;
+
         while (isConnected && connection.isOpen()) {
             if (timer.isTimeout()) {
-                logger.debug(String.format("[%s] Timeout happen. Will try to receive data for %d amount of time else will re-send the packet.", hostName, AppConstants.CONSUMER_WAIT_TIME));
                 timer.stopTimer();
 
-                //Putting timeout period on socket input stream read method
-                connection.setTimeOut(AppConstants.CONSUMER_WAIT_TIME);
-
-                byte[] data = connection.receive();
-                while (data != null) {
-                    logger.debug("Received data after time-out too");
-                    processData(data);
-
-                    data = connection.receive();
-                }
-
-                //First, closing the connection
-                connection.closeConnection();
-
+                logger.info(String.format("[%s] Timeout happen. Received %d number of logs. Sending PULL request to broker to get topic %s:%d information from offset %d", hostName, count, topic, key, offset));
                 //Sending the pull request to the broker with new offset
-                logger.info(String.format("[%s] Sending PULL request to broker to get topic %s:%d information from offset %d", hostName, topic, key, offset));
-                byte[] request = AppPacketHandler.createToBrokerRequest(AppConstants.REQUESTER.CONSUMER, AppConstants.TYPE.PULL, topic, key, offset);
-                if (connectToBroker(request, AppConstants.TYPE.PULL.name())) {
-                    timer.startTimer("CONSUMER PULL TIMER", AppConstants.CONSUMER_WAIT_TIME);
-                } else {
-                    logger.warn(String.format("[%s] Not able to connect to the broker to get topic %s:%d offset: %d information", hostName, topic, key, offset));
-                    isConnected = true;
-                }
+                sendPULLRequest();
+                count = 0;
+            } else if (count == Constants.CONSUMER_MAX_PULL_SIZE) {
+                timer.stopTimer();
+
+                logger.debug(String.format("[%s]  Received %d number of logs. Sending pull request to broker to get topic %s:%d information from offset %d", hostName, count, topic, key, offset));
+                //Sending the pull request to the broker with new offset
+                sendPULLRequest();
+                count = 0;
             } else if (connection.isAvailable()) {
                 byte[] data = connection.receive();
-                processData(data);
+                if (processData(data)) {
+                    count++;
+                }
             }
         }
     }
@@ -132,16 +123,28 @@ public class Consumer extends Client {
         }
     }
 
-    private void processData(byte[] packet) {
+    private void sendPULLRequest() {
+        byte[] request = PacketHandler.createToBrokerRequest(Constants.REQUESTER.CONSUMER, Constants.TYPE.PULL, topic, key, offset, Constants.CONSUMER_MAX_PULL_SIZE);
+        if (connectToBroker(request, Constants.TYPE.PULL.name())) {
+            timer.startTimer("CONSUMER PULL TIMER", Constants.CONSUMER_WAIT_TIME);
+        } else {
+            logger.warn(String.format("[%s] Not able to connect to the broker to get topic %s:%d offset: %d information", hostName, topic, key, offset));
+            isConnected = true;
+        }
+    }
+
+    private boolean processData(byte[] packet) {
+        boolean flag = false;
+
         if (packet != null) {
-            Header.Content header = AppPacketHandler.getHeader(packet);
+            Header.Content header = PacketHandler.getHeader(packet);
 
             if (header != null) {
-                if (header.getType() == AppConstants.TYPE.DATA.getValue()) {
-                    byte[] data = AppPacketHandler.getData(packet);
+                if (header.getType() == Constants.TYPE.DATA.getValue()) {
+                    byte[] data = PacketHandler.getData(packet);
 
                     if (data != null) {
-                        if (method == AppConstants.METHOD.PULL) {
+                        if (method == Constants.METHOD.PULL) {
                             logger.debug(String.format("[%s] [%s:%d] [PULL] Received the data from the broker with the offset as %d.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getOffset()));
                         } else {
                             logger.debug(String.format("[%s] [%s:%d] [PUSH] Received the data from the broker.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort()));
@@ -149,12 +152,13 @@ public class Consumer extends Client {
 
                         try {
                             queue.put(data);
+                            flag = true;
 
-                            if (method == AppConstants.METHOD.PULL) {
+                            if (method == Constants.METHOD.PULL) {
                                 offset = header.getOffset();
                             }
                         } catch (InterruptedException e) {
-                            logger.error(String.format("[%s] [%s] Fail to add items to the queue", hostName, method.name()), e);
+                            logger.error(String.format("[%s] [%s] Fail to add item to the queue", hostName, method.name()), e);
                         }
                     } else {
                         logger.warn(String.format("[%s] [%s] No data found from the received packet. Ignored", hostName, method.name()));
@@ -165,5 +169,7 @@ public class Consumer extends Client {
                 logger.warn(String.format("[%s] [%s] Invalid header received from the broker. Ignored", hostName, method.name()));
             }
         }
+
+        return flag;
     }
 }

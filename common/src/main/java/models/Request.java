@@ -8,6 +8,7 @@ public class Request extends Object {
     private String topicName;
     private int partition;
     private int offset;
+    private int numOfMsg;
 
     public Request(int type, String topicName, int partition) {
         this.type = type;
@@ -20,6 +21,13 @@ public class Request extends Object {
         this.topicName = topicName;
         this.partition = partition;
         this.offset = offset;
+    }
+    public Request(int type, String topicName, int partition, int offset, int numOfMsg) {
+        this.type = type;
+        this.topicName = topicName;
+        this.partition = partition;
+        this.offset = offset;
+        this.numOfMsg = numOfMsg;
     }
 
     public Request() {}
@@ -42,6 +50,10 @@ public class Request extends Object {
 
     public void setOffset(int offset) {
         this.offset = offset;
+    }
+
+    public int getNumOfMsg() {
+        return numOfMsg;
     }
 
     public boolean isValid() {

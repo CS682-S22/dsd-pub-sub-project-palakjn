@@ -1,9 +1,13 @@
-package controllers;
+package controllers.application;
+
+import framework.Consumer;
+import framework.Producer;
 
 import configuration.Constants;
 import configurations.AppConstants;
 import configurations.Config;
 import configurations.TopicConfig;
+import controllers.Connection;
 import models.Header;
 import models.Properties;
 import models.Topic;
@@ -104,7 +108,7 @@ public class Processor {
     }
 
     private void produce(Config config, TopicConfig topicConfig) {
-        String hostName = String.format("Producer - %s", config.getHostName());
+        String hostName = String.format("framework.Producer - %s", config.getHostName());
         logger.info(String.format("Started %s", hostName));
 
         Properties properties = new Properties();
@@ -132,7 +136,7 @@ public class Processor {
     }
 
     private void consume(Config config, TopicConfig topicConfig) {
-        String hostName = String.format("Consumer - %s", config.getHostName());
+        String hostName = String.format("framework.Consumer - %s", config.getHostName());
         logger.info(String.format("Started %s", hostName));
 
         String method = AppConstants.METHOD.PULL.name();

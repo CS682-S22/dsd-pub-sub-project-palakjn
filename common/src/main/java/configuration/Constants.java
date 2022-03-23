@@ -5,6 +5,10 @@ public class Constants {
     public static final int END_VALID_PORT = 1724;
     public static int RTT = 8000; //Response Turnout time. The time (in milliseconds) host will be waiting for response.
     public static int NUM_OF_THREADS = 50;
+    public static int THREAD_COUNT = 1;
+    public static int QUEUE_BUFFER_SIZE = 1000;
+    public static int CONSUMER_WAIT_TIME = 10000;
+    public static int CONSUMER_MAX_PULL_SIZE = 500;
 
     public enum REQUESTER {
         LOAD_BALANCER(0),

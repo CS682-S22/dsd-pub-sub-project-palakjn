@@ -1,7 +1,6 @@
-import configuration.Constants;
 import configurations.AppConstants;
 import configurations.Config;
-import controllers.Processor;
+import controllers.application.Processor;
 import utilities.JSONDesrializer;
 import utilities.Strings;
 
@@ -71,7 +70,7 @@ public class Application {
         } else if ((config.isProducer() || config.isConsumer()) && (config.getTopics() == null || config.getTopics().size() == 0)) {
             System.out.println("No producer/consumer details found");
         } else if (config.isConsumer() && !(config.getMethod() == AppConstants.METHOD.PULL.getValue() || config.getMethod() == AppConstants.METHOD.PUSH.getValue())) {
-            System.out.println("Wrong method provided for Consumer.(Accepted method: 0 for PULL & 1 for PUSH)");
+            System.out.println("Wrong method provided for framework.Consumer.(Accepted method: 0 for PULL & 1 for PUSH)");
         } else {
             flag = true;
         }

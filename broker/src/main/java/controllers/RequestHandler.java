@@ -37,12 +37,12 @@ public class RequestHandler {
                         hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                     }
                 } else if (header.getRequester() == BrokerConstants.REQUESTER.PRODUCER.getValue()) {
-                    logger.info("Received request from Producer.");
+                    logger.info("Received request from framework.Producer.");
                     ProducerHandler producerHandler = new ProducerHandler(connection);
                     producerHandler.processRequest(header, request);
                     running = false;
                 } else if (header.getRequester() == BrokerConstants.REQUESTER.CONSUMER.getValue()) {
-                    logger.info("Received request from Consumer.");
+                    logger.info("Received request from framework.Consumer.");
                     ConsumerHandler consumerHandler = new ConsumerHandler(connection);
                     consumerHandler.processRequest(header, request);
                     running = false;
