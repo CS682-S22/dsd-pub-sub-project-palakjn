@@ -17,6 +17,11 @@ import java.nio.file.Paths;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * Responsible for starting the instance of the Broker to the configured host.
+ *
+ * @author Palak Jain
+ */
 public class Broker {
     private static final Logger logger = LogManager.getLogger(Broker.class);
     private ExecutorService threadPool;
@@ -45,6 +50,9 @@ public class Broker {
         }
     }
 
+    /**
+     * Get the location of the config file from arguments
+     */
     private String getConfigLocation(String[] args) {
         String location = null;
 
@@ -59,6 +67,9 @@ public class Broker {
         return location;
     }
 
+    /**
+     * Read and De-Serialize the config file from the given location
+     */
     private Config getConfig(String location) {
         Config config = null;
 
@@ -72,6 +83,9 @@ public class Broker {
         return config;
     }
 
+    /**
+     * Validates whether the config contains the required values or not
+     */
     private boolean isValid(Config config) {
         boolean flag = false;
 
@@ -86,6 +100,9 @@ public class Broker {
         return flag;
     }
 
+    /**
+     * Listen for new connection
+     */
     private void listen(Config config) {
         ServerSocket serverSocket;
 

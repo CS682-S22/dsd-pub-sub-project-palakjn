@@ -6,6 +6,11 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import utilities.BrokerPacketHandler;
 
+/**
+ * Responsible for handling requests from other hosts.
+ *
+ * @author Palak Jain
+ */
 public class RequestHandler {
     private static final Logger logger = LogManager.getLogger(RequestHandler.class);
     private HostService hostService;
@@ -16,6 +21,9 @@ public class RequestHandler {
         this.hostService = new HostService(logger);
     }
 
+    /**
+     * Calls appropriate handler to process the request based on who made the request.
+     */
     public void process() {
         boolean running = true;
         int curSeq = 0;

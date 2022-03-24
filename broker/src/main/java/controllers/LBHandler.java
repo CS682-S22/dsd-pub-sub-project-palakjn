@@ -10,6 +10,11 @@ import utilities.JSONDesrializer;
 import java.io.IOException;
 import java.net.Socket;
 
+/**
+ * Responsible for handling requests from load balancer.
+ *
+ * @author Palak Jain
+ */
 public class LBHandler {
     private static final Logger logger = LogManager.getLogger(LBHandler.class);
     private HostService hostService;
@@ -24,14 +29,23 @@ public class LBHandler {
         hostService = new HostService(logger);
     }
 
+    /**
+     * Send the request to load balancer to join the network
+     */
     public boolean join(Host brokerInfo, Host loadBalancerInfo) {
         return send(brokerInfo, loadBalancerInfo, BrokerConstants.TYPE.ADD);
     }
 
+    /**
+     * Send the request to load balancer to remove it from the network
+     */
     public boolean remove(Host brokerInfo, Host loadBalancerInfo) {
         return send(brokerInfo, loadBalancerInfo, BrokerConstants.TYPE.REM);
     }
 
+    /**
+     * Process the request based on the action received from the load balancer
+     */
     public boolean processRequest(Header.Content header, byte[] request) {
         boolean isSuccess = false;
 
@@ -85,6 +99,9 @@ public class LBHandler {
         return isSuccess;
     }
 
+    /**
+     * Send the request to add/remove to the load balancer
+     */
     private boolean send(Host brokerInfo, Host loadBalancerInfo, BrokerConstants.TYPE type) {
         boolean isSuccess = false;
 

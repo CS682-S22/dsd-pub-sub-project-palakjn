@@ -7,8 +7,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 
+/**
+ * Responsible for handling input/output requests to the file.
+ *
+ * @author Palak Jain
+ */
 public class FileManager {
 
+    /**
+     * Creates the directory to the given location
+     */
     public boolean createDirectory(String parentLocation, String folderLocation) {
         Path path = Path.of(parentLocation, folderLocation);
 
@@ -28,6 +36,9 @@ public class FileManager {
         return isSuccess;
     }
 
+    /**
+     * Write the data to the given location
+     */
     public boolean write(byte[] data, String location) {
         boolean isSuccess = false;
 
@@ -41,6 +52,9 @@ public class FileManager {
         return isSuccess;
     }
 
+    /**
+     * Deletes the directory in the local
+     */
     private boolean deleteDirectory(Path path) {
         boolean isSuccess = false;
 

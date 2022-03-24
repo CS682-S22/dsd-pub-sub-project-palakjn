@@ -2,7 +2,6 @@ package controller;
 
 import controllers.Connection;
 import controllers.ConsumerHandler;
-import controllers.ProducerHandler;
 import models.File;
 import models.Request;
 import models.Segment;
@@ -15,8 +14,16 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Responsible for testing functions in ConsumerHandler class.
+ *
+ * @author Palak Jain
+ */
 public class ConsumerHandlerTest {
 
+    /**
+     * Test whether getSegmentNumber() returns the segment number if exact given offset exist
+     */
     @Test
     public void getSegmentNumber_exactOffset_returnSegment() {
         Request request = new Request(1, "topic", 0, 15);
@@ -39,6 +46,10 @@ public class ConsumerHandlerTest {
         Assertions.assertEquals(0, actual);
     }
 
+    /**
+     * Test whether getSegmentNumber return the segment number if the exact offset don't exist but the offset which is less
+     * than the given offset exists
+     */
     @Test
     public void getSegmentNumber_inRangeOffset_returnSegment() {
         Request request = new Request(1, "topic", 0, 37);
@@ -61,6 +72,9 @@ public class ConsumerHandlerTest {
         Assertions.assertEquals(1, actual);
     }
 
+    /**
+     * Create 2 segments with pre-initialized offsets.
+     */
     private void setup(File partition) {
         Segment segment1 = new Segment("xyz", 0, 27);
         segment1.addOffset(0);

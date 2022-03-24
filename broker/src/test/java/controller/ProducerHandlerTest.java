@@ -19,8 +19,16 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Responsible for testing functions in ProducerHandler.
+ *
+ * @author Palak Jain
+ */
 public class ProducerHandlerTest {
 
+    /**
+     * Test whether receive() method append new date to the current segment or not
+     */
     @Test
     public void receive_addData_appendToSegment() {
         Connection connection = addDataToChannel();
@@ -35,6 +43,9 @@ public class ProducerHandlerTest {
         Assertions.assertEquals(16, buffer.length);
     }
 
+    /**
+     * Test whether receive() method writes correct offset to the current segment
+     */
     @Test
     public void receive_addData_writeCorrectOffset() {
         Connection connection = addDataToChannel();
@@ -49,6 +60,9 @@ public class ProducerHandlerTest {
         Assertions.assertEquals(12, offset);
     }
 
+    /**
+     * Add dummy data to the channel for receive() method to read from
+     */
     private Connection addDataToChannel() {
         byte[] data = "data".getBytes(StandardCharsets.UTF_8);
         byte[] packet = BrokerPacketHandler.createDataPacket(BrokerConstants.REQUESTER.PRODUCER, data);
@@ -69,6 +83,9 @@ public class ProducerHandlerTest {
         return connection;
     }
 
+    /**
+     * Create few initialize segments
+     */
     private Segment setUpSegment(File partition) {
         Segment segment = new Segment("xyz", 0, 0);
 

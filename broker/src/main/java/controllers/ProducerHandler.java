@@ -10,6 +10,11 @@ import org.apache.logging.log4j.Logger;
 import utilities.BrokerPacketHandler;
 import utilities.JSONDesrializer;
 
+/**
+ * Responsible for handling requests from producer.
+ *
+ * @author Palak Jain
+ */
 public class ProducerHandler {
     private static final Logger logger = LogManager.getLogger(ProducerHandler.class);
     private HostService hostService;
@@ -20,6 +25,9 @@ public class ProducerHandler {
         hostService = new HostService(logger);
     }
 
+    /**
+     * Process the request from producer based on the action.
+     */
     public void processRequest(Header.Content header, byte[] message) {
         if (header.getType() == BrokerConstants.TYPE.ADD.getValue()) {
             byte[] body = BrokerPacketHandler.getData(message);
@@ -30,6 +38,7 @@ public class ProducerHandler {
                 if (request != null && request.isValid()) {
                     logger.info(String.format("[%s:%d] Received request to add the logs for the topic %s - partition %d from the producer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), request.getTopicName(), request.getPartition(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
 
+                    //Checks if broker handling the topic-partition information or not
                     if (CacheManager.isExist(request.getTopicName(), request.getPartition())) {
                         hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
 
@@ -53,6 +62,9 @@ public class ProducerHandler {
         }
     }
 
+    /**
+     * Receives data from publisher, write to the local segment as well as send to all the subscribers.
+     */
     private void receive(File partition) {
         boolean reading = true;
 
@@ -89,6 +101,9 @@ public class ProducerHandler {
         }
     }
 
+    /**
+     * Send the data to all the subscribers which broker handling.
+     */
     private void sendToSubscribers(byte[] data) {
         int numOfSubscribers = CacheManager.getSubscribersCount();
 

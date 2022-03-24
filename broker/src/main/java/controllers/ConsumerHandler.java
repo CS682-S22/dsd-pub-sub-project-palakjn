@@ -15,6 +15,11 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * Responsible for handling requests from Consumer.
+ *
+ * @author Palak Jain
+ */
 public class ConsumerHandler {
     private static final Logger logger = LogManager.getLogger(ConsumerHandler.class);
     private HostService hostService;
@@ -27,6 +32,9 @@ public class ConsumerHandler {
         hostService = new HostService(logger);
     }
 
+    /**
+     * Identifies the action and process the request accordingly
+     */
     public void processRequest(Header.Content header, byte[] message) {
         byte[] body = BrokerPacketHandler.getData(message);
 
@@ -55,6 +63,9 @@ public class ConsumerHandler {
         }
     }
 
+    /**
+     * Validates whether the received request is valid, if broker holding partition information of the requested topic.
+     */
     private boolean validateRequest(Header.Content header, Request request) {
         boolean isValid = false;
 
@@ -78,6 +89,9 @@ public class ConsumerHandler {
         return isValid;
     }
 
+    /**
+     * Process pull request where it sends the requested number of logs and again read for new PULL request
+     */
     private void processPullRequest(Request request) {
         while (connection.isOpen()) {
             processRequest(request);
@@ -86,6 +100,9 @@ public class ConsumerHandler {
         }
     }
 
+    /**
+     * Receive pull request from consumer, return request if it is a valid request else null
+     */
     private Request receivePullRequest() {
         Request request = null;
 
@@ -112,6 +129,9 @@ public class ConsumerHandler {
         return request;
     }
 
+    /**
+     * Send the logs if available from the requested offset. Send NACK if requested offset is more than the available data.
+     */
     private void processRequest(Request request) {
         File partition = CacheManager.getPartition(request.getTopicName(), request.getPartition());
 
@@ -125,6 +145,9 @@ public class ConsumerHandler {
         }
     }
 
+    /**
+     * Get the segment number which contains the requested offset. If exact offset don't exist then, return the segment number which contains the offset which is just less than the given offset
+     */
     private int getSegmentNumber(Request request, File partition) {
         int segmentNumber = partition.getSegmentNumber(request.getOffset());
         if (segmentNumber == -1) {
@@ -144,6 +167,11 @@ public class ConsumerHandler {
         return segmentNumber;
     }
 
+    /**
+     * Get all the available segments to read from the segment number which contains the offset.
+     * If the method is PUSH then, send all the logs from the available segments.
+     * If the method is PULL then, send only the requested amount of logs.
+     */
     private void sendPartition(Request request, File partition, int segmentNumber) {
         List<Segment> segments = partition.getSegmentsFrom(segmentNumber);
         int count = 0;
@@ -164,6 +192,9 @@ public class ConsumerHandler {
         }
     }
 
+    /**
+     * Reads one log from segment file and send to the consumer
+     */
     private void sendSegment(Segment segment, int offsetIndex) {
         try (FileInputStream stream = new FileInputStream(segment.getLocation())) {
             int length;
@@ -190,6 +221,9 @@ public class ConsumerHandler {
         }
     }
 
+    /**
+     * Sends the data to the consumer with the next offset
+     */
     private void send(byte[] data, int nextOffset) {
         if (method == BrokerConstants.METHOD.PULL) {
             connection.send(BrokerPacketHandler.createDataPacket(data, nextOffset));

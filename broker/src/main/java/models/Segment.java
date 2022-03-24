@@ -6,6 +6,11 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Responsible for holding segment information's like buffer, offsets.
+ *
+ * @author Palak Jain
+ */
 public class Segment {
     private int segment;
     private byte[] buffer;
@@ -23,18 +28,30 @@ public class Segment {
         this.availableSize = availableSize;
     }
 
+    /**
+     * Get the current segment
+     */
     public int getSegment() {
         return segment;
     }
 
+    /**
+     * Add new offset to the collection
+     */
     public void addOffset(int offset) {
         offsets.add(offset);
     }
 
+    /**
+     * Checks if the given offset exists
+     */
     public boolean isOffsetExist(int offset) {
         return offsets.contains(offset);
     }
 
+    /**
+     * Get the offset which is less than or equal to the given offset
+     */
     public int getRoundUpOffset(int initialOffset) {
         int roundUpOffset = -1;
 
@@ -49,14 +66,24 @@ public class Segment {
         return roundUpOffset;
     }
 
+    /**
+     * Get the index which is holding the offset
+     */
     public int getOffsetIndex(int offset) {
         return offsets.indexOf(offset);
     }
 
+    /**
+     * Gets the number of offsets the segment has
+     */
     public int getNumOfOffsets() {
         return offsets.size();
     }
 
+    /**
+     * Gets the offset at the given index.
+     * If the given index if OutOfBound then returns -1
+     */
     public int getOffset(int index) {
         if (index < offsets.size()) {
             return offsets.get(index);
@@ -65,6 +92,9 @@ public class Segment {
         }
     }
 
+    /**
+     * Write data to the local buffer
+     */
     public void write(byte[] data) {
         if (buffer == null) {
             buffer = data;
@@ -76,6 +106,9 @@ public class Segment {
         numOfLogs++;
     }
 
+    /**
+     * Write the buffer data to the file
+     */
     public boolean flush() {
         boolean isSuccess;
 
@@ -85,22 +118,37 @@ public class Segment {
         return isSuccess;
     }
 
+    /**
+     * Get the buffer
+     */
     public byte[] getBuffer() {
         return buffer;
     }
 
+    /**
+     * Checks if segment holding any data or not
+     */
     public boolean isEmpty() {
         return buffer == null;
     }
 
-   public int getNumOfLogs() {
+    /**
+     * Gets the number of logs written to the current segment
+     */
+    public int getNumOfLogs() {
         return numOfLogs;
-   }
+    }
 
+    /**
+     * Gets the file location of the segment
+     */
     public String getLocation() {
         return location;
     }
 
+    /**
+     * Gets the total size of the data written to current segment plus the total size of the data written to previous segments.
+     */
     public int getAvailableSize() {
         return availableSize;
     }

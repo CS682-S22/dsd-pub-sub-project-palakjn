@@ -5,10 +5,17 @@ import controllers.FileManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.lang.reflect.Array;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+/**
+ * Responsible for holding the partition information of the topic.
+ *
+ * @author Palak Jain
+ */
 public class File {
     private static final Logger logger = LogManager.getLogger(File.class);
     private List<Segment> segments;
@@ -28,6 +35,9 @@ public class File {
         lock = new ReentrantReadWriteLock();
     }
 
+    /**
+     * Initialize with the topic name, partition, location where the segments will be created.
+     */
     public boolean initialize(String parentLocation, String topic, int partition) {
         this.parentLocation = String.format("%s/%s/%d", parentLocation, topic, partition);
         segment = new Segment(this.parentLocation, 0, 0);
@@ -35,6 +45,10 @@ public class File {
         return fileManager.createDirectory(parentLocation, String.format("%s/%d", topic, partition));
     }
 
+    /**
+     * Writes new data to the segment.
+     * Flush the segment either after certain amount of time elapsed or the number of logs holding exceeded the MAX allowed number of logs.
+     */
     public void write(byte[] data) {
         lock.writeLock().lock();
 
@@ -67,6 +81,9 @@ public class File {
         lock.writeLock().unlock();
     }
 
+    /**
+     * Getting the segment number which is holding the offset
+     */
     public int getSegmentNumber(int offset) {
         lock.readLock().lock();
         int segmentNumber = -1;
@@ -84,6 +101,9 @@ public class File {
         return segmentNumber;
     }
 
+    /**
+     * Getting the offset which is less than the given the offset.
+     */
     public int getRoundUpOffset(int offset) {
         lock.readLock().lock();
         int roundUpOffset = -1;
@@ -104,6 +124,9 @@ public class File {
         return roundUpOffset;
     }
 
+    /**
+     * Get all the available segment from the given number
+     */
     public List<Segment> getSegmentsFrom(int segmentNumber) {
         List<Segment> segments = new ArrayList<>();
         lock.readLock().lock();
@@ -116,6 +139,9 @@ public class File {
         return segments;
     }
 
+    /**
+     * Flush the segment to the disk and create new segment to write to for future data
+     */
     private void flush() {
         lock.writeLock().lock();
 
