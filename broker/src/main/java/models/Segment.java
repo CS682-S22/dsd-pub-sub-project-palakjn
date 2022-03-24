@@ -49,24 +49,6 @@ public class Segment {
         return roundUpOffset;
     }
 
-    public List<Integer> getOffsets(int start, int length) {
-        List<Integer> offsets = new ArrayList<>();
-        int count = 0;
-
-        for (int offset : this.offsets) {
-            if (count < length) {
-                if (offset >= start) {
-                    offsets.add(offset);
-                    count++;
-                }
-            } else {
-                break;
-            }
-        }
-
-        return offsets;
-    }
-
     public int getOffsetIndex(int offset) {
         return offsets.indexOf(offset);
     }
@@ -76,7 +58,11 @@ public class Segment {
     }
 
     public int getOffset(int index) {
-        return offsets.get(index);
+        if (index < offsets.size()) {
+            return offsets.get(index);
+        } else {
+            return -1;
+        }
     }
 
     public void write(byte[] data) {
@@ -91,12 +77,16 @@ public class Segment {
     }
 
     public boolean flush() {
-        boolean isSuccess = false;
+        boolean isSuccess;
 
         isSuccess = fileManager.write(buffer, location);
         buffer = null;
 
         return isSuccess;
+    }
+
+    public byte[] getBuffer() {
+        return buffer;
     }
 
     public boolean isEmpty() {

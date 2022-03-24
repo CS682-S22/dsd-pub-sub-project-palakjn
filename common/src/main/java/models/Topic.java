@@ -16,6 +16,12 @@ public class Topic extends Object {
         this.partitions = new ArrayList<>();
     }
 
+    public Topic(String name, int numOfPartitions) {
+        this.name = name;
+        this.numOfPartitions = numOfPartitions;
+        this.partitions = new ArrayList<>();
+    }
+
     public String getName() {
         return name;
     }

@@ -60,6 +60,16 @@ public class CacheManager {
         return broker;
     }
 
+    public static boolean isBrokerExist(Host broker) {
+        boolean flag;
+        brokerLock.readLock().lock();
+
+        flag = brokers.stream().anyMatch(host -> host.getAddress().equals(broker.getAddress()) && host.getPort() == broker.getPort());
+
+        brokerLock.readLock().unlock();
+        return flag;
+    }
+
     public static int getNumberOfBrokers() {
         int size;
         brokerLock.readLock().lock();
@@ -96,6 +106,18 @@ public class CacheManager {
 
         topicLock.writeLock().unlock();
         return flag;
+    }
+
+    public static void removeTopic(Topic topic) {
+        topicLock.writeLock().lock();
+
+        topicMap.remove(topic.getName());
+
+        for (Partition partition : topic.getPartitions()) {
+            partitionMap.remove(String.format("%s:%s", partition.getTopicName(), partition.getNumber()));
+        }
+
+        topicLock.writeLock().unlock();
     }
 
     public static void removePartitions(Topic topicToRemove) {

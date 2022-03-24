@@ -1,0 +1,98 @@
+package controller;
+
+import controllers.Connection;
+import controllers.ConsumerHandler;
+import controllers.ProducerHandler;
+import models.File;
+import models.Request;
+import models.Segment;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ConsumerHandlerTest {
+
+    @Test
+    public void getSegmentNumber_exactOffset_returnSegment() {
+        Request request = new Request(1, "topic", 0, 15);
+        File partition = new File();
+
+        setup(partition);
+
+        ConsumerHandler consumerHandler = new ConsumerHandler(null);
+        int actual = -1;
+
+        try {
+            Method processMethod = ConsumerHandler.class.getDeclaredMethod("getSegmentNumber", Request.class, File.class);
+            processMethod.setAccessible(true);
+            actual = (int) processMethod.invoke(consumerHandler, request, partition);
+
+        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException exception) {
+            System.err.println(exception.getMessage());
+        }
+
+        Assertions.assertEquals(0, actual);
+    }
+
+    @Test
+    public void getSegmentNumber_inRangeOffset_returnSegment() {
+        Request request = new Request(1, "topic", 0, 37);
+        File partition = new File();
+
+        setup(partition);
+
+        ConsumerHandler consumerHandler = new ConsumerHandler(new Connection());
+        int actual = -1;
+
+        try {
+            Method processMethod = ConsumerHandler.class.getDeclaredMethod("getSegmentNumber", Request.class, File.class);
+            processMethod.setAccessible(true);
+            actual = (int) processMethod.invoke(consumerHandler, request, partition);
+
+        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException exception) {
+            System.err.println(exception.getMessage());
+        }
+
+        Assertions.assertEquals(1, actual);
+    }
+
+    private void setup(File partition) {
+        Segment segment1 = new Segment("xyz", 0, 27);
+        segment1.addOffset(0);
+        segment1.addOffset(5);
+        segment1.addOffset(15);
+        segment1.addOffset(17);
+        segment1.addOffset(21);
+
+        Segment segment2 = new Segment("abc", 1, 59);
+        segment2.addOffset(27);
+        segment2.addOffset(35);
+        segment2.addOffset(42);
+        segment2.addOffset(54);
+
+        List<Segment> segments = new ArrayList<>();
+        segments.add(segment1);
+        segments.add(segment2);
+
+        try {
+            Field outputStream = File.class.getDeclaredField("segments");
+            outputStream.setAccessible(true);
+            outputStream.set(partition, segments);
+        } catch (NoSuchFieldException | IllegalAccessException exception) {
+            exception.printStackTrace();
+        }
+
+        try {
+            Field outputStream = File.class.getDeclaredField("availableSize");
+            outputStream.setAccessible(true);
+            outputStream.set(partition, 59);
+        } catch (NoSuchFieldException | IllegalAccessException exception) {
+            exception.printStackTrace();
+        }
+    }
+}

@@ -131,13 +131,13 @@ public class ConsumerHandler {
             //Exact offset not found. Getting the offset which is less than the given offset.
             int roundUpOffset = partition.getRoundUpOffset(request.getOffset());
             if (roundUpOffset != -1) {
-                logger.debug(String.format("[%s:%d] [%s] Broker don't have exact offset %d. Sending information from %d offset instead", connection.getDestinationIPAddress(), connection.getDestinationPort(), method.name(),  request.getOffset(), roundUpOffset));
+                logger.debug(String.format("[%s:%d] [%s] Broker don't have exact offset %d. Sending information from %d offset instead", connection.getDestinationIPAddress(), connection.getDestinationPort(), method != null ? method.name() : null,  request.getOffset(), roundUpOffset));
                 request.setOffset(roundUpOffset);
 
                 //Getting again segment number with new rounded offset
                 segmentNumber = partition.getSegmentNumber(request.getOffset());
             } else {
-                logger.warn(String.format("[%s:%d] [%s] No offset %d found for the topic %s - partition %d information.", connection.getDestinationIPAddress(), connection.getDestinationPort(), method.name(), request.getOffset(), request.getTopicName(), request.getPartition()));
+                logger.warn(String.format("[%s:%d] [%s] No offset %d found for the topic %s - partition %d information.", connection.getDestinationIPAddress(), connection.getDestinationPort(), method != null ? method.name() : null, request.getOffset(), request.getTopicName(), request.getPartition()));
             }
         }
 
