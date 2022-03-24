@@ -6,8 +6,16 @@ import utilities.Strings;
 
 import java.nio.charset.StandardCharsets;
 
-public class Object {
+/**
+ * Responsible for converting object fields to string and byte array.
+ *
+ * @author Palak Jain
+ */
+public abstract class Object {
 
+    /**
+     * Format the object to JSON and return it as a string
+     */
     public String toString() {
         String stringFormat = null;
 
@@ -21,6 +29,9 @@ public class Object {
         return stringFormat;
     }
 
+    /**
+     * Format the object to JSON and return it as a byte array
+     */
     public byte[] toByte() {
         byte[] bytes = null;
         String json = toString();

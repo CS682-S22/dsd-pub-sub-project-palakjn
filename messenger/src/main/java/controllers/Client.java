@@ -15,6 +15,11 @@ import java.io.IOException;
 import java.net.Socket;
 import java.util.regex.Pattern;
 
+/**
+ * Responsible for holding common functions to use by Producer/Consumer.
+ *
+ * @author Palak Jain
+ */
 public class Client {
     protected Logger logger;
     protected boolean isConnected;
@@ -36,6 +41,9 @@ public class Client {
         hostService = new HostService(logger);
     }
 
+    /**
+     * Get the broker information which is holding the given topic and partition number
+     */
     protected boolean getBroker(byte[] packet, String topic, int partitionNum) {
         boolean isSuccess = false;
 
@@ -52,6 +60,9 @@ public class Client {
         return isSuccess;
     }
 
+    /**
+     * Get the broker information from the load balancer which is holding the partition information of a topic
+     */
     protected Partition getBroker(byte[] packet) {
         Partition partition = null;
 
@@ -111,6 +122,9 @@ public class Client {
         return partition;
     }
 
+    /**
+     * Send initial connection establishment request to the broker
+     */
     protected boolean connectToBroker(byte[] packet, String packetName) {
         boolean isSuccess = false;
 
@@ -129,6 +143,9 @@ public class Client {
         return isSuccess;
     }
 
+    /**
+     * Checks if the given string contains numeric value or not
+     */
     //cite: https://www.baeldung.com/java-check-string-number
     protected boolean isNumeric(String strNum) {
         if (strNum == null) {
@@ -139,6 +156,9 @@ public class Client {
         return pattern.matcher(strNum).matches();
     }
 
+    /**
+     * Extract address and port information from the string
+     */
     private Host getHostInfo(String detail) {
         Host host = null;
 

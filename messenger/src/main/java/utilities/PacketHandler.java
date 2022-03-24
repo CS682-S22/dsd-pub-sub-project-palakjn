@@ -115,39 +115,56 @@ public class PacketHandler {
         return packet;
     }
 
+    /**
+     * Create the data packet
+     */
     public static byte[] createDataPacket(Constants.REQUESTER requester, byte[] data) {
         byte[] header = createHeader(requester, Constants.TYPE.DATA);
         return ByteBuffer.allocate(4 + header.length + data.length).putInt(header.length).put(header).put(data).array();
     }
 
+    /**
+     * Create request to get broker information which is holding topic-partition information
+     */
     public static byte[] createGetBrokerReq(Constants.REQUESTER requester, String topic, int partition) {
         return createPacket(requester, Constants.TYPE.REQ, topic, partition);
     }
 
+    /**
+     * Create request to the broker which is holding the topic-partition information
+     */
     public static byte[] createToBrokerRequest(Constants.REQUESTER requester, Constants.TYPE type, String topic, int partition) {
         return createPacket(requester, type, topic, partition);
     }
 
+    /**
+     * Create request to the broker which is holding the topic-partition information. Mention the offset to read from in the data
+     */
     public static byte[] createToBrokerRequest(Constants.REQUESTER requester, Constants.TYPE type, String topic, int partition, int offset) {
         return createPacket(requester, type, topic, partition, offset, 0);
     }
 
+    /**
+     * Create request to the broker which is holding the topic-partition information. Mention the offset to read from in the data plus number of records to read
+     */
     public static byte[] createToBrokerRequest(Constants.REQUESTER requester, Constants.TYPE type, String topic, int partition, int offset, int numOfRecords) {
         return createPacket(requester, type, topic, partition, offset, numOfRecords);
     }
 
+    /**
+     * Create request to the broker which is holding the topic-partition information.
+     */
     private static byte[] createPacket(Constants.REQUESTER requester, Constants.TYPE type, String topic, int partition) {
         return createPacket(requester, type, topic, partition, 0, 0);
     }
 
+    /**
+     * Create request to the broker which is holding the topic-partition information. Mention the offset to read from in the data plus number of records to read
+     */
     private static byte[] createPacket(Constants.REQUESTER requester, Constants.TYPE type, String topic, int partition, int offset, int numOfRecords) {
         Request request = new Request(Constants.REQUEST.PARTITION.getValue(), topic, partition, offset, numOfRecords);
 
         return createPacket(requester, type, request);
-    }
-
-    public static byte[] createDataPacket(byte[] data) {
-        return createDataPacket(Constants.REQUESTER.PRODUCER, data);
     }
 
     /**

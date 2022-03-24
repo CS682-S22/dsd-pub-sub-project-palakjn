@@ -116,14 +116,6 @@ public class Connection implements Sender, Receiver {
         return isSend;
     }
 
-    public void setTimeOut(int timeOut) {
-        try {
-            channel.setSoTimeout(timeOut);
-        } catch (SocketException e) {
-            System.err.println("Unable to set the timer. Error:" + e);
-        }
-    }
-
     /**
      * Receive message from another host.
      * @return the message being received

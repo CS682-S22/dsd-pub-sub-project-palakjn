@@ -6,6 +6,11 @@ import org.apache.logging.log4j.Logger;
 import utilities.NodeTimer;
 import utilities.PacketHandler;
 
+/**
+ * Responsible for handling common services which a host needs like sending ACK, NACK, etc.
+ *
+ * @author Palak Jain
+ */
 public class HostService {
     private Logger logger;
 
@@ -13,21 +18,33 @@ public class HostService {
         this.logger = logger;
     }
 
+    /**
+     * Send an acknowledgment response to the host
+     */
     public void sendACK(Connection connection, Constants.REQUESTER requester, int seqNum) {
         byte[] acknowledgement = PacketHandler.createACK(requester, seqNum);
         connection.send(acknowledgement);
     }
 
+    /**
+     * Send the negative acknowledgment response with the sequence number to the host
+     */
     public void sendNACK(Connection connection, Constants.REQUESTER requester, int seqNum) {
         byte[] negAck = PacketHandler.createNACK(requester, seqNum);
         connection.send(negAck);
     }
 
+    /**
+     * Send the negative acknowledgment response to the host
+     */
     public void sendNACK(Connection connection, Constants.REQUESTER requester) {
         byte[] negAck = PacketHandler.createNACK(requester);
         connection.send(negAck);
     }
 
+    /**
+     * Send the packet to the host and waits for an acknowledgement. Re-send the packet if time-out
+     */
     public boolean sendPacketWithACK(Connection connection, byte[] packet, String packetName) {
         boolean isSuccess = false;
         NodeTimer timer = new NodeTimer();

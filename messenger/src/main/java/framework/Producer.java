@@ -11,6 +11,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 
+/**
+ * Responsible for producing logs to the broker.
+ *
+ * @author Palak Jain
+ */
 public class Producer extends Client {
     private BlockingQueue<byte[]> queue;
     private ExecutorService threadPool;
@@ -23,6 +28,9 @@ public class Producer extends Client {
         this.threadPool = Executors.newFixedThreadPool(Constants.THREAD_COUNT);
     }
 
+    /**
+     * Send the data to the broker which is holding the given topic and key
+     */
     public void send(String topic, int key, byte[] data) {
         if (!isConnected) {
             byte[] lbPacket = PacketHandler.createGetBrokerReq(Constants.REQUESTER.PRODUCER, topic, key);
@@ -39,7 +47,7 @@ public class Producer extends Client {
             }
         }
 
-        byte[] dataPacket = PacketHandler.createDataPacket(data);
+        byte[] dataPacket = PacketHandler.createDataPacket(Constants.REQUESTER.PRODUCER, data);
         try {
             queue.put(dataPacket);
         } catch (InterruptedException e) {
@@ -47,6 +55,9 @@ public class Producer extends Client {
         }
     }
 
+    /**
+     * Get the data from the queue and send to the broker.
+     */
     private void send() {
         while (running) {
             try {

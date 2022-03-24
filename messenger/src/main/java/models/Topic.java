@@ -6,6 +6,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+/**
+ * Responsible for holding topic information
+ *
+ * @author Palak Jain
+ */
 public class Topic extends Object {
     private String name;
     private int numOfPartitions;
@@ -22,18 +27,30 @@ public class Topic extends Object {
         this.partitions = new ArrayList<>();
     }
 
+    /**
+     * Get the name of the topic
+     */
     public String getName() {
         return name;
     }
 
+    /**
+     * Get the number of partitions
+     */
     public int getNumOfPartitions() {
         return numOfPartitions;
     }
 
+    /**
+     * Get the partitions
+     */
     public List<Partition> getPartitions() {
         return partitions;
     }
 
+    /**
+     * Add new partition to the list
+     */
     public void addPartition(Partition partition) {
         if (partitions == null) {
             partitions = new ArrayList<>();
@@ -42,10 +59,16 @@ public class Topic extends Object {
         numOfPartitions++;
     }
 
+    /**
+     * Checks whether the name is not null or empty
+     */
     public boolean isValid() {
         return !Strings.isNullOrEmpty(name);
     }
 
+    /**
+     * Group topic by broker
+     */
     public HashMap<String, Topic> groupBy() {
         HashMap<String, Topic> result = new HashMap<>();
 
@@ -61,11 +84,17 @@ public class Topic extends Object {
         return result;
     }
 
+    /**
+     * Remove partition from the topic
+     */
     public void remove(int partNum) {
         partitions.removeIf(partition -> partition.getNumber() == partNum);
         numOfPartitions--;
     }
 
+    /**
+     * Get the String containing list of partition identifiers topic has
+     */
     public String getPartitionString() {
         StringBuilder builder = new StringBuilder();
 

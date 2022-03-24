@@ -11,6 +11,11 @@ import utilities.Strings;
 
 import java.util.concurrent.*;
 
+/**
+ * Responsible for consuming logs from broker
+ *
+ * @author Palak Jain
+ */
 public class Consumer extends Client {
     private BlockingQueue<byte[]> queue;
     private ExecutorService threadPool;
@@ -26,11 +31,13 @@ public class Consumer extends Client {
         queue = new LinkedBlockingDeque<>(Constants.QUEUE_BUFFER_SIZE);
         this.threadPool = Executors.newFixedThreadPool(Constants.THREAD_COUNT);
 
+        //Get the offset
         String offset = properties.getValue(Constants.PROPERTY_KEY.OFFSET);
         if (!Strings.isNullOrEmpty(offset) && isNumeric(offset)) {
             this.offset = Integer.parseInt(offset);
         }
 
+        //Get the method PULL or POST
         String method = properties.getValue(Constants.PROPERTY_KEY.METHOD);
         if (!Strings.isNullOrEmpty(method)) {
             this.method = Constants.findMethodByName(method);
@@ -43,6 +50,9 @@ public class Consumer extends Client {
         timer = new NodeTimer();
     }
 
+    /**
+     * Subscribe the topic and partition with the broker.
+     */
     public boolean subscribe(String topic, int key) {
         boolean flag = false;
         byte[] lbPacket = PacketHandler.createGetBrokerReq(Constants.REQUESTER.CONSUMER, topic, key);
@@ -54,6 +64,7 @@ public class Consumer extends Client {
             brokerRequest = PacketHandler.createToBrokerRequest(Constants.REQUESTER.CONSUMER, Constants.TYPE.ADD, topic, key, offset);
         }
 
+        //Get the broker and connect to the broker
         if ((broker != null ||
                 getBroker(lbPacket, topic, key)) && connectToBroker(brokerRequest, method.name())) {
             this.topic = topic;
@@ -76,6 +87,9 @@ public class Consumer extends Client {
         return flag;
     }
 
+    /**
+     * Get the data from the queue within the given timeline.
+     */
     public byte[] poll(int milliseconds) {
         byte[] data = null;
 
@@ -88,6 +102,10 @@ public class Consumer extends Client {
         return data;
     }
 
+    /**
+     * Try to receive data from broker.
+     * Will re-send the pull request if timeout or received requested number of logs.
+     */
     private void processPULL() {
         int count = 0;
 
@@ -115,6 +133,9 @@ public class Consumer extends Client {
         }
     }
 
+    /**
+     * Receive data from the broker
+     */
     private void processPUSH() {
         while (isConnected && connection.isOpen()) {
             byte[] data = connection.receive();
@@ -123,6 +144,9 @@ public class Consumer extends Client {
         }
     }
 
+    /**
+     * Send pull request to the broker to get n number of data from the given offset
+     */
     private void sendPULLRequest() {
         byte[] request = PacketHandler.createToBrokerRequest(Constants.REQUESTER.CONSUMER, Constants.TYPE.PULL, topic, key, offset, Constants.CONSUMER_MAX_PULL_SIZE);
         if (connectToBroker(request, Constants.TYPE.PULL.name())) {
@@ -134,6 +158,9 @@ public class Consumer extends Client {
         }
     }
 
+    /**
+     * Decode the received packet and write to the queue for the application to read from.
+     */
     private boolean processData(byte[] packet) {
         boolean flag = false;
 

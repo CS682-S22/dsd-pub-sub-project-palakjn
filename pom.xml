@@ -16,7 +16,7 @@
     <modules>
         <module>broker</module>
         <module>loadBalancer</module>
-        <module>common</module>
+        <module>messenger</module>
     </modules>
 
     <dependencies>
