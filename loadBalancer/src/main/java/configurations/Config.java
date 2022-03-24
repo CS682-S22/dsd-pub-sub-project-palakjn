@@ -3,6 +3,11 @@ package configurations;
 import configuration.Constants;
 import utilities.Strings;
 
+/**
+ Responsible for holding load balancer config values
+
+ @author Palak Jain
+ */
 public class Config {
     private String address;
     private int port;

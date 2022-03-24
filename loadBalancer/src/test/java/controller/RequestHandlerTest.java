@@ -18,8 +18,16 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 
+/**
+ * Responsible for testing functions in RequestHandler class
+ *
+ * @author Palak Jain
+ */
 public class RequestHandlerTest {
 
+    /**
+     * Test if createTopic() send NACK if creating new topic when there are no brokers.
+     */
     @Test
     public void createTopic_noBroker_sendNack() {
         Topic topic = new Topic("Sample", 2);
@@ -27,6 +35,9 @@ public class RequestHandlerTest {
         createTopic_isNack(topic);
     }
 
+    /**
+     * Test if createTopic() send NACK if creating a topic which already exists
+     */
     @Test
     public void createTopic_existTopic_sendNack() {
         Topic topic = new Topic("Sample", 3);
@@ -39,6 +50,9 @@ public class RequestHandlerTest {
         }
     }
 
+    /**
+     * Test whether createTopic() create new topic if not exists
+     */
     @Test
     public void createTopic_newTopic_shouldCreateTopic() {
         Host sampleBroker = new Host("address", 1234);
@@ -58,6 +72,9 @@ public class RequestHandlerTest {
         }
     }
 
+    /**
+     * Test if processBrokerRequest() add new broker to the collection
+     */
     @Test
     public void processBrokerRequest_addBroker_shouldAdd() {
         Host sampleBroker = new Host("address", 1700);
@@ -74,6 +91,9 @@ public class RequestHandlerTest {
         }
     }
 
+    /**
+     * Test if processBrokerRequest() remove broker information from the collection
+     */
     @Test
     public void processBrokerRequest_remBroker_shouldRemove() {
         Host sampleBroker = new Host("address", 1700);
@@ -92,6 +112,9 @@ public class RequestHandlerTest {
         }
     }
 
+    /**
+     * Create request, send to the broker and asserts if the response is NACK
+     */
     private void createTopic_isNack(Topic topic) {
         Connection connection = new Connection();
         ByteArrayOutputStream byteArrayOutputStream = mockConnection(connection);
@@ -105,6 +128,9 @@ public class RequestHandlerTest {
         Assertions.assertEquals(header.getType(), Constants.TYPE.NACK.getValue());
     }
 
+    /**
+     * Send the request to create new topic
+     */
     private void sendRequest(Connection connection, Topic topic) {
         RequestHandler requestHandler = new RequestHandler(connection);
 
@@ -118,16 +144,25 @@ public class RequestHandlerTest {
         }
     }
 
+    /**
+     * Create and send request to add new broker
+     */
     private void sendReqToAddBroker(Connection connection, Host broker) {
         byte[] packet = PacketHandler.createPacket(Constants.REQUESTER.BROKER, Constants.TYPE.ADD, broker);
         sendReqToAddRemBroker(connection, packet, Constants.TYPE.ADD.getValue());
     }
 
+    /**
+     * Create and send request to remove broker
+     */
     private void sendReqToRemBroker(Connection connection, Host broker) {
         byte[] packet = PacketHandler.createPacket(Constants.REQUESTER.BROKER, Constants.TYPE.REM, broker);
         sendReqToAddRemBroker(connection, packet, Constants.TYPE.REM.getValue());
     }
 
+    /**
+     * Send add/remove request to broker
+     */
     private void sendReqToAddRemBroker(Connection connection, byte[] packet, int action) {
         RequestHandler requestHandler = new RequestHandler(connection);
 
@@ -141,6 +176,9 @@ public class RequestHandlerTest {
         }
     }
 
+    /**
+     * Add outputstream for the connection object to write to
+     */
     private ByteArrayOutputStream mockConnection(Connection connection) {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);

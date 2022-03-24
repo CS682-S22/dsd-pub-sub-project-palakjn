@@ -17,6 +17,11 @@ import java.nio.file.Paths;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * Responsible for starting up load balancer.
+ *
+ * @author Palak Jain
+ */
 public class LoadBalancer {
     private static final Logger logger = LogManager.getLogger(LoadBalancer.class);
     private ExecutorService threadPool;
@@ -40,6 +45,9 @@ public class LoadBalancer {
         }
     }
 
+    /**
+     * Listen for new connections from another host
+     */
     private void listen(Config config) {
         ServerSocket serverSocket;
 
@@ -68,6 +76,9 @@ public class LoadBalancer {
         }
     }
 
+    /**
+     * Get the location of the config file from arguments
+     */
     private String getConfigLocation(String[] args) {
         String location = null;
 
@@ -82,6 +93,9 @@ public class LoadBalancer {
         return location;
     }
 
+    /**
+     * Read and De-Serialize the config file from the given location
+     */
     private Config getConfig(String location) {
         Config config = null;
 
@@ -95,6 +109,9 @@ public class LoadBalancer {
         return config;
     }
 
+    /**
+     * Validates whether the config contains the required values or not
+     */
     private boolean isValid(Config config) {
         boolean flag = false;
 

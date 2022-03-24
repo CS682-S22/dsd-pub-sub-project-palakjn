@@ -14,6 +14,11 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * Responsible for handling requests from another host.
+ *
+ * @author Palak Jain
+ */
 public class RequestHandler {
     private static final Logger logger = LogManager.getLogger(RequestHandler.class);
     private HostService hostService;
@@ -25,6 +30,9 @@ public class RequestHandler {
         this.hostService = new HostService(logger);
     }
 
+    /**
+     * Gets the request from another host and process them based on requester and action
+     */
     public void process() {
         boolean running = true;
 
@@ -62,6 +70,9 @@ public class RequestHandler {
         }
     }
 
+    /**
+     * Process the request from broker to add/remove it from the network
+     */
     private void processBrokerRequest(byte[] message, int action) {
         byte[] body = LBPacketHandler.getData(message);
 
@@ -90,6 +101,9 @@ public class RequestHandler {
         }
     }
 
+    /**
+     * Send broker details to producer/consumer which is holding the given partition of the topic.
+     */
     private void sendBrokerDetails(byte[] message) {
         byte[] body = LBPacketHandler.getData(message);
         byte[] response = null;
@@ -132,6 +146,9 @@ public class RequestHandler {
         }
     }
 
+    /**
+     * Process the request to create new topic
+     */
     private void processTopicRequest(byte[] message, int action) {
         byte[] body = LBPacketHandler.getData(message);
 
@@ -152,6 +169,11 @@ public class RequestHandler {
         }
     }
 
+    /**
+     * Create new topic with the partitions.
+     * Allocate partitions to the available broker based on the load on each.
+     * Send topic-partition information to brokers which are going to handle them.
+     */
     private void createTopic(Topic topic) {
         if (CacheManager.isTopicExist(topic.getName())) {
             logger.warn(String.format("[%s:%d] Topic with the name %s already exist. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
@@ -189,6 +211,9 @@ public class RequestHandler {
         }
     }
 
+    /**
+     * Send partitions information of a topic to respective brokers
+     */
     private void sendToBrokers(Topic topic) {
         HashMap<String, Topic> partitionsPerBroker = topic.groupBy();
 
@@ -203,6 +228,9 @@ public class RequestHandler {
         threadPool.shutdown();
     }
 
+    /**
+     * Send the partitions' information of a topic to the broker which is going to handle them.
+     */
     private void sendToBroker(Topic topic) {
         try {
             Host brokerInfo = topic.getPartitions().get(0).getBroker();
@@ -224,6 +252,9 @@ public class RequestHandler {
         }
     }
 
+    /**
+     * Send an acknowledgement and increment the sequence number which is expected to read for next request
+     */
     private void sendAck() {
         hostService.sendACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
         curSeq++;

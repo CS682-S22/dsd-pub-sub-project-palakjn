@@ -24,22 +24,31 @@ public class CacheManager {
     private CacheManager() {
     }
 
+    /**
+     * Add broker if not exist to the collection
+     */
     public static void addBroker(Host broker) {
         brokerLock.writeLock().lock();
 
-        if (!isExist(broker)) {
+        if (!isBrokerExist(broker)) {
             brokers.add(broker);
         }
 
         brokerLock.writeLock().unlock();
     }
 
+    /**
+     * Remove broker from the collection
+     */
     public static void removeBroker(Host broker) {
         brokerLock.writeLock().lock();
         brokers.removeIf(host -> host.getAddress().equals(broker.getAddress()) && host.getPort() == broker.getPort());
         brokerLock.writeLock().unlock();
     }
 
+    /**
+     * Find the broker which is holding less number of partitions.
+     */
     public static Host findBrokerWithLessLoad() {
         Host broker;
         brokerLock.writeLock().lock();
@@ -60,6 +69,9 @@ public class CacheManager {
         return broker;
     }
 
+    /**
+     * Checks whether broker exists
+     */
     public static boolean isBrokerExist(Host broker) {
         boolean flag;
         brokerLock.readLock().lock();
@@ -70,6 +82,9 @@ public class CacheManager {
         return flag;
     }
 
+    /**
+     * Get the number of brokers in the network
+     */
     public static int getNumberOfBrokers() {
         int size;
         brokerLock.readLock().lock();
@@ -80,16 +95,9 @@ public class CacheManager {
         return size;
     }
 
-    public static boolean isExist(Host broker) {
-        boolean flag;
-        brokerLock.readLock().lock();
-
-        flag = brokers.stream().anyMatch(host -> host.getAddress().equals(broker.getAddress()) && host.getPort() == broker.getPort());
-
-        brokerLock.readLock().unlock();
-        return flag;
-    }
-
+    /**
+     * Add new topic to the collection.
+     */
     public static boolean addTopic(Topic topic) {
         boolean flag = false;
         topicLock.writeLock().lock();
@@ -108,6 +116,9 @@ public class CacheManager {
         return flag;
     }
 
+    /**
+     * Remove topic information from the collection
+     */
     public static void removeTopic(Topic topic) {
         topicLock.writeLock().lock();
 
@@ -120,6 +131,9 @@ public class CacheManager {
         topicLock.writeLock().unlock();
     }
 
+    /**
+     * Remove partitions of the give topic from the map
+     */
     public static void removePartitions(Topic topicToRemove) {
         topicLock.writeLock().lock();
 
@@ -139,6 +153,9 @@ public class CacheManager {
         topicLock.writeLock().unlock();
     }
 
+    /**
+     * Checks whether topic exist
+     */
     public static boolean isTopicExist(String topic) {
         boolean flag;
         topicLock.readLock().lock();
@@ -149,6 +166,9 @@ public class CacheManager {
         return flag;
     }
 
+    /**
+     * Get the topic by name
+     */
     public static Topic getTopic(String name) {
         Topic topic;
         topicLock.readLock().lock();
@@ -159,6 +179,9 @@ public class CacheManager {
         return topic;
     }
 
+    /**
+     * Get the partition with the given topic name and partition number
+     */
     public static Partition getPartition(String name, int partition) {
         Partition part;
         topicLock.readLock().lock();
@@ -169,6 +192,9 @@ public class CacheManager {
         return part;
     }
 
+    /**
+     * Checks whether partition with the given topic name and partition number exists or not
+     */
     public static boolean isPartitionExist(String name, int partition) {
         boolean flag;
         topicLock.readLock().lock();
