@@ -23,17 +23,24 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * Responsible for producing/consuming logs from the Producer/Consumer based on the actions specified by the config
+ *
+ * @author Palak Jain
+ */
 public class Processor {
     private static final Logger logger = LogManager.getLogger(Processor.class);
     private ExecutorService threadPool;
 
+    /**
+     * Process the actions as instructed in the config
+     */
     public void process(Config config) {
         if (config.isCreateTopic()) {
             createTopics(config);
         } else if (config.isProducer() || config.isConsumer()) {
             threadPool = Executors.newFixedThreadPool(config.getTopics().size());
 
-            int index = 0;
             for (TopicConfig topicConfig : config.getTopics()) {
                 if (topicConfig.isValid()) {
                     if (config.isProducer()) {
@@ -42,12 +49,13 @@ public class Processor {
                         threadPool.execute(() -> consume(config, topicConfig));
                     }
                 }
-
-                index++;
             }
         }
     }
 
+    /**
+     * Create number of topics as given
+     */
     private void createTopics(Config config) {
         //Connect to the load balancer
 
@@ -107,6 +115,9 @@ public class Processor {
         }
     }
 
+    /**
+     * Reads from the logs and send each log line to the producer
+     */
     private void produce(Config config, TopicConfig topicConfig) {
         String hostName = String.format("framework.Producer - %s", config.getHostName());
         logger.info(String.format("Started %s", hostName));
@@ -135,6 +146,9 @@ public class Processor {
         }
     }
 
+    /**
+     * Fetch logs from the consumer in a specified amount of time
+     */
     private void consume(Config config, TopicConfig topicConfig) {
         String hostName = String.format("framework.Consumer - %s", config.getHostName());
         logger.info(String.format("Started %s", hostName));

@@ -9,6 +9,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+/**
+ * Responsible for starting the instance of the Application.
+ *
+ * @author Palak Jain
+ */
 public class Application {
     public static void main(String[] args) {
 
@@ -26,6 +31,9 @@ public class Application {
         }
     }
 
+    /**
+     * Get the location of the config file from arguments
+     */
     private String getConfigLocation(String[] args) {
         String location = null;
 
@@ -40,6 +48,9 @@ public class Application {
         return location;
     }
 
+    /**
+     * Read and De-Serialize the config file from the given location
+     */
     private Config getConfig(String location) {
         Config config = null;
 
@@ -53,6 +64,9 @@ public class Application {
         return config;
     }
 
+    /**
+     * Validates whether the config contains the required values or not
+     */
     private boolean isValid(Config config) {
         boolean flag = false;
 
