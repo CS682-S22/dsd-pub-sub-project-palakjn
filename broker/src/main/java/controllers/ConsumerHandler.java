@@ -74,7 +74,7 @@ public class ConsumerHandler {
 
             if (CacheManager.isExist(request.getTopicName(), request.getPartition())) {
                 logger.warn(String.format("[%s:%d] [%s] Broker holding the topic %s - partition %d information.", connection.getSourceIPAddress(), connection.getSourcePort(), BrokerConstants.findTypeByValue(header.getType()), request.getTopicName(), request.getPartition()));
-                hostService.sendACK(connection, BrokerConstants.REQUESTER.CONSUMER, header.getSeqNum());
+                hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
 
                 isValid = true;
             } else {

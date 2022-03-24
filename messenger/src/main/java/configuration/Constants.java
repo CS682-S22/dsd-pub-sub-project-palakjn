@@ -8,7 +8,7 @@ package configuration;
 public class Constants {
     public static final int START_VALID_PORT = 1700;
     public static final int END_VALID_PORT = 1724;
-    public static int RTT = 8000; //Response Turnout time. The time (in milliseconds) host will be waiting for response.
+    public static int RTT = 30000; //Response Turnout time. The time (in milliseconds) host will be waiting for response.
     public static int NUM_OF_THREADS = 50;
     public static int THREAD_COUNT = 1;
     public static int QUEUE_BUFFER_SIZE = 1000;
