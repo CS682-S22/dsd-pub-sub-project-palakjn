@@ -22,7 +22,7 @@ public class Connection implements Sender, Receiver {
     protected int sourcePort;
     private DataInputStream inputStream;
     private DataOutputStream outputStream;
-    private boolean isClosed;
+    private volatile boolean isClosed;
 
     public Connection(Socket channel, String destinationIPAddress, int destinationPort, String sourceIPAddress, int sourcePort) {
         this.channel = channel;
@@ -161,9 +161,11 @@ public class Connection implements Sender, Receiver {
      */
     public void closeConnection() {
         try {
-            if(inputStream != null) inputStream.close();
-            if(outputStream != null) outputStream.close();
-            channel.close();
+            if (inputStream != null) inputStream.close();
+            if (outputStream != null) outputStream.close();
+            if (channel != null) channel.close();
+
+            isClosed = true;
         } catch (IOException e) {
             System.err.printf("[%s:%d] Unable to close the connection. Error: %s", sourceIPAddress, sourcePort, e.getMessage());
         }

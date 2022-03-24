@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
  */
 public class Client {
     protected Logger logger;
-    protected boolean isConnected;
+    protected volatile boolean isConnected;
     protected Host broker;
     protected Host loadBalancer;
     protected Connection connection;

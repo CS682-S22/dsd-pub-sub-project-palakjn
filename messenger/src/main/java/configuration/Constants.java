@@ -14,6 +14,7 @@ public class Constants {
     public static int QUEUE_BUFFER_SIZE = 1000;
     public static int CONSUMER_WAIT_TIME = 10000;
     public static int CONSUMER_MAX_PULL_SIZE = 500;
+    public static int PRODUCER_WAIT_TIME = 3000;
 
     public enum REQUESTER {
         LOAD_BALANCER(0),

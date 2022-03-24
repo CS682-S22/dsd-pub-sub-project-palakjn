@@ -6,10 +6,7 @@ import models.Properties;
 import org.apache.logging.log4j.LogManager;
 import utilities.PacketHandler;
 
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.*;
 
 /**
  * Responsible for producing logs to the broker.
@@ -19,7 +16,6 @@ import java.util.concurrent.LinkedBlockingDeque;
 public class Producer extends Client {
     private BlockingQueue<byte[]> queue;
     private ExecutorService threadPool;
-    private volatile boolean running = true;
 
     public Producer(Properties properties) {
         super(LogManager.getLogger("producer"), properties);
@@ -59,14 +55,16 @@ public class Producer extends Client {
      * Get the data from the queue and send to the broker.
      */
     private void send() {
-        while (running) {
+        while (isConnected && connection.isOpen()) {
             try {
-                byte[] data = queue.take();
+                byte[] data = queue.poll(Constants.PRODUCER_WAIT_TIME, TimeUnit.MILLISECONDS);
 
-                if (connection.send(data)) {
-                    logger.warn(String.format("[%s:%d] [%s] Send %d number of bytes to the broker", broker.getAddress(), broker.getPort(), hostName, data.length));
-                } else {
-                    logger.warn(String.format("[%s:%d] [%s] Not able to send the data to the broker", broker.getAddress(), broker.getPort(), hostName));
+                if (data != null) {
+                    if (connection.send(data)) {
+                        logger.warn(String.format("[%s:%d] [%s] Send %d number of bytes to the broker", broker.getAddress(), broker.getPort(), hostName, data.length));
+                    } else {
+                        logger.warn(String.format("[%s:%d] [%s] Not able to send the data to the broker", broker.getAddress(), broker.getPort(), hostName));
+                    }
                 }
             } catch (InterruptedException e) {
                 logger.error(String.format("[%s] Interrupted while getting data to post to the broker", hostName), e);
