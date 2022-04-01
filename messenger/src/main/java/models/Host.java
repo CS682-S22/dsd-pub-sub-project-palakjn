@@ -9,9 +9,16 @@ import utilities.Strings;
  * @author Palak Jain
  */
 public class Host extends Object {
+    private int priorityNum;
     private String address;
     private int port;
     private int numberOfPartitions; // Number of partitions a corresponding broker holding. [Will be 0 for other type of hosts: producer/consumer/load balancer]
+
+    public Host(int priorityNum, String address, int port) {
+        this.priorityNum = priorityNum;
+        this.address = address;
+        this.port = port;
+    }
 
     public Host(String address, int port) {
         this.address = address;
@@ -20,6 +27,20 @@ public class Host extends Object {
 
     public Host() {
 
+    }
+
+    /**
+     * Setting the priority number for the host
+     */
+    public void setPriorityNum(int priorityNum) {
+        this.priorityNum = priorityNum;
+    }
+
+    /**
+     * Getting the priority number of the host
+     */
+    public int getPriorityNum() {
+        return priorityNum;
     }
 
     /**

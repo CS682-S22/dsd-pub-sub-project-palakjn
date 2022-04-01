@@ -83,8 +83,11 @@ public class RequestHandler {
                 if (action == Constants.TYPE.ADD.getValue()) {
                     logger.warn(String.format("[%s:%d] Received JOIN request from the broker. Adding the broker to the collection.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
                     CacheManager.addBroker(broker);
-                    sendAck();
-                    logger.info(String.format("[%s:%d] Added the broker to the collection.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+
+                    //Sending response to the broker with the priority number
+                    sendJoinResponse(broker);
+
+                    logger.info(String.format("[%s:%d] Added the broker with %d priority number to the collection.", connection.getDestinationIPAddress(), connection.getDestinationPort(), broker.getPriorityNum()));
                     System.out.printf("Broker %s:%d joined the network.\n", connection.getDestinationIPAddress(), connection.getDestinationPort());
                 } else if (action == Constants.TYPE.REM.getValue()) {
                     logger.warn(String.format("[%s:%d] Received REMOVE request from the broker. Removing the broker from the collection.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
@@ -257,6 +260,12 @@ public class RequestHandler {
      */
     private void sendAck() {
         hostService.sendACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
+        curSeq++;
+    }
+
+    private void sendJoinResponse(Host broker) {
+        byte[] response = LBPacketHandler.createJoinResponse(broker.getPriorityNum());
+        connection.send(response);
         curSeq++;
     }
 }

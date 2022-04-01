@@ -17,6 +17,8 @@ public class CacheManager {
     private static Map<String, Topic> topicMap = new HashMap<>();            // Map topic name to the topic object. Useful when a customer need to read from all the partitions of a topic
     private static Map<String, Partition> partitionMap = new HashMap<>();    // Map topic name + partition to the partition object. Useful when a customer wants to read from particular topic partition as well as when the producer wants to publish message
 
+    private static int counter; // Counter which will incremented by one whenever new broker is joined.
+
     //locks
     private static final ReentrantReadWriteLock brokerLock = new ReentrantReadWriteLock();
     private static final ReentrantReadWriteLock topicLock = new ReentrantReadWriteLock();
@@ -31,10 +33,17 @@ public class CacheManager {
         brokerLock.writeLock().lock();
 
         if (!isBrokerExist(broker)) {
+            //Giving the broker a priority number
+            broker.setPriorityNum(counter);
+
             brokers.add(broker);
+
+            //Incrementing the counter by 1
+            counter++;
         }
 
         brokerLock.writeLock().unlock();
+
     }
 
     /**
