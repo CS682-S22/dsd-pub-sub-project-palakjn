@@ -7,6 +7,7 @@ import models.Topic;
 
 import java.util.*;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Stream;
 
 /**
  * Static global cache alike class storing the configuration of the system.
@@ -30,10 +31,15 @@ public class CacheManager {
     /**
      * Add broker if not exist to the collection
      */
-    public static void addBroker(Host broker) {
+    public static Host addBroker(Host broker) {
         brokerLock.writeLock().lock();
 
-        if (!isBrokerExist(broker)) {
+        //Getting existing broker
+        Host existingBroker = getBroker(broker.getAddress(), broker.getPort());
+
+        if (existingBroker == null) {
+            //Newly joined broker
+
             //Giving the broker a priority number
             broker.setPriorityNum(counter);
 
@@ -41,10 +47,12 @@ public class CacheManager {
 
             //Incrementing the counter by 1
             counter++;
+        } else {
+            broker = existingBroker;
         }
 
         brokerLock.writeLock().unlock();
-
+        return broker;
     }
 
     /**
@@ -96,6 +104,19 @@ public class CacheManager {
 
         brokerLock.readLock().unlock();
         return flag;
+    }
+
+    /**
+     * Get the broker object with the given address and port
+     */
+    public static Host getBroker(String address, int port) {
+        Host broker = null;
+        brokerLock.readLock().lock();
+
+        broker = brokers.stream().filter(host -> host.getAddress().equals(address) && host.getPort() == port).findAny().orElse(null);
+
+        brokerLock.readLock().unlock();
+        return broker;
     }
 
     /**

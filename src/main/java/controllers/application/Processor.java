@@ -11,6 +11,7 @@ import controllers.Connection;
 import models.Header;
 import models.Properties;
 import models.Topic;
+import models.requests.CreateTopicRequest;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import utilities.AppPacketHandler;
@@ -65,14 +66,14 @@ public class Processor {
 
             Connection connection = new Connection(socket, config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort());
             if (connection.openConnection()) {
-                List<Topic> topics = config.getTopicsToCreate();
+                List<CreateTopicRequest> topics = config.getTopicsToCreate();
                 NodeTimer timer = new NodeTimer();
                 int seqNum = 0; //Sequence number of the packet which is indented to send to another host
 
-                for (Topic topic : topics) {
-                    logger.info(String.format("[%s:%d] Creating %d partitions of topic %s.", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort(), topic.getNumOfPartitions(), topic.getName()));
+                for (CreateTopicRequest createTopicRequest : topics) {
+                    logger.info(String.format("[%s:%d] Creating %d partitions of topic %s.", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort(), createTopicRequest.getNumOfPartitions(), createTopicRequest.getName()));
 
-                    byte[] packet = AppPacketHandler.createAddTopicPacket(topic, seqNum);
+                    byte[] packet = AppPacketHandler.createAddTopicPacket(createTopicRequest, seqNum);
 
                     connection.send(packet);
                     timer.startTimer("TOPIC", AppConstants.RTT);
@@ -80,7 +81,7 @@ public class Processor {
 
                     while (reading) {
                         if (timer.isTimeout()) {
-                            logger.warn(String.format("[%s:%d] Timeout happen for the packet having topic %s - partition count %d information. Sending again", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort(), topic.getName(), topic.getNumOfPartitions()));
+                            logger.warn(String.format("[%s:%d] Timeout happen for the packet having topic %s - partition count %d information. Sending again", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort(), createTopicRequest.getName(), createTopicRequest.getNumOfPartitions()));
                             connection.send(packet);
                             timer.stopTimer();
                             timer.startTimer("TOPIC", AppConstants.RTT);
@@ -101,7 +102,7 @@ public class Processor {
                                             logger.info(String.format("[%s:%d] Received an acknowledgment for the older packet with the sequence number %d. Ignoring it.", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort(), header.getSeqNum()));
                                         }
                                     } else if (header.getType() == AppConstants.TYPE.NACK.getValue()) {
-                                        logger.info(String.format("[%s:%d] Received a negative acknowledgment for the packet having topic %s - partition count %d information.", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort(), topic.getName(), topic.getNumOfPartitions()));
+                                        logger.info(String.format("[%s:%d] Received a negative acknowledgment for the packet having topic %s - partition count %d information.", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort(), createTopicRequest.getName(), createTopicRequest.getNumOfPartitions()));
                                         reading = false;
                                     }
                                 }

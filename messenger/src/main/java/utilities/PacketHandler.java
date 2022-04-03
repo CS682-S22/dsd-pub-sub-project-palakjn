@@ -4,7 +4,9 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import configuration.Constants;
 import models.Header;
 import models.Object;
-import models.Request;
+import models.requests.GetBrokerRequest;
+import models.requests.TopicReadWriteRequest;
+import models.requests.Request;
 
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
@@ -127,7 +129,9 @@ public class PacketHandler {
      * Create request to get broker information which is holding topic-partition information
      */
     public static byte[] createGetBrokerReq(Constants.REQUESTER requester, String topic, int partition) {
-        return createPacket(requester, Constants.TYPE.REQ, topic, partition);
+        GetBrokerRequest request = new GetBrokerRequest(topic, partition);
+
+        return createPacket(requester, Constants.TYPE.REQ, new Request<>(request));
     }
 
     /**
@@ -162,9 +166,9 @@ public class PacketHandler {
      * Create request to the broker which is holding the topic-partition information. Mention the offset to read from in the data plus number of records to read
      */
     private static byte[] createPacket(Constants.REQUESTER requester, Constants.TYPE type, String topic, int partition, int offset, int numOfRecords) {
-        Request request = new Request(Constants.REQUEST.PARTITION.getValue(), topic, partition, offset, numOfRecords);
+        TopicReadWriteRequest readTopicRequest = new TopicReadWriteRequest(topic, partition, offset, numOfRecords);
 
-        return createPacket(requester, type, request);
+        return createPacket(requester, type, new Request<>(readTopicRequest));
     }
 
     /**

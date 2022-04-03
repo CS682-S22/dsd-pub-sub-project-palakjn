@@ -4,7 +4,8 @@ import configuration.Constants;
 import configurations.BrokerConstants;
 import models.File;
 import models.Header;
-import models.Request;
+import models.requests.Request;
+import models.requests.TopicReadWriteRequest;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import utilities.BrokerPacketHandler;
@@ -33,19 +34,24 @@ public class ProducerHandler {
             byte[] body = BrokerPacketHandler.getData(message);
 
             if (body != null) {
-                Request request = JSONDesrializer.fromJson(body, Request.class);
+                Request<TopicReadWriteRequest> request = JSONDesrializer.fromJson(body, Request.class);
+                TopicReadWriteRequest writeTopicRequest = null;
 
-                if (request != null && request.isValid()) {
-                    logger.info(String.format("[%s:%d] Received request to add the logs for the topic %s - partition %d from the producer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), request.getTopicName(), request.getPartition(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                if (request != null) {
+                    writeTopicRequest = request.getRequest();
+                }
+
+                if (writeTopicRequest != null && writeTopicRequest.isValid()) {
+                    logger.info(String.format("[%s:%d] Received request to add the logs for the topic %s - partition %d from the producer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), writeTopicRequest.getName(), writeTopicRequest.getPartition(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
 
                     //Checks if broker handling the topic-partition information or not
-                    if (CacheManager.isExist(request.getTopicName(), request.getPartition())) {
+                    if (CacheManager.isExist(writeTopicRequest.getName(), writeTopicRequest.getPartition())) {
                         hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
 
-                        File file = CacheManager.getPartition(request.getTopicName(), request.getPartition());
+                        File file = CacheManager.getPartition(writeTopicRequest.getName(), writeTopicRequest.getPartition());
                         receive(file);
                     } else {
-                        logger.warn(String.format("[%s:%d] Current broker %s:%d not holding any topic %s - partition %d. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), connection.getSourceIPAddress(), connection.getSourcePort(), request.getTopicName(), request.getPartition()));
+                        logger.warn(String.format("[%s:%d] Current broker %s:%d not holding any topic %s - partition %d. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), connection.getSourceIPAddress(), connection.getSourcePort(), writeTopicRequest.getName(), writeTopicRequest.getPartition()));
                         hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                     }
                 } else {

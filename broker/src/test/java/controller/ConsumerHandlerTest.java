@@ -3,8 +3,8 @@ package controller;
 import controllers.Connection;
 import controllers.ConsumerHandler;
 import models.File;
-import models.Request;
 import models.Segment;
+import models.requests.TopicReadWriteRequest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -26,7 +26,7 @@ public class ConsumerHandlerTest {
      */
     @Test
     public void getSegmentNumber_exactOffset_returnSegment() {
-        Request request = new Request(1, "topic", 0, 15);
+        TopicReadWriteRequest request = new TopicReadWriteRequest("topic", 1, 0, 15);
         File partition = new File();
 
         setup(partition);
@@ -35,7 +35,7 @@ public class ConsumerHandlerTest {
         int actual = -1;
 
         try {
-            Method processMethod = ConsumerHandler.class.getDeclaredMethod("getSegmentNumber", Request.class, File.class);
+            Method processMethod = ConsumerHandler.class.getDeclaredMethod("getSegmentNumber", TopicReadWriteRequest.class, File.class);
             processMethod.setAccessible(true);
             actual = (int) processMethod.invoke(consumerHandler, request, partition);
 
@@ -52,7 +52,7 @@ public class ConsumerHandlerTest {
      */
     @Test
     public void getSegmentNumber_inRangeOffset_returnSegment() {
-        Request request = new Request(1, "topic", 0, 37);
+        TopicReadWriteRequest request = new TopicReadWriteRequest("topic", 1, 0, 37);
         File partition = new File();
 
         setup(partition);
@@ -61,7 +61,7 @@ public class ConsumerHandlerTest {
         int actual = -1;
 
         try {
-            Method processMethod = ConsumerHandler.class.getDeclaredMethod("getSegmentNumber", Request.class, File.class);
+            Method processMethod = ConsumerHandler.class.getDeclaredMethod("getSegmentNumber", TopicReadWriteRequest.class, File.class);
             processMethod.setAccessible(true);
             actual = (int) processMethod.invoke(consumerHandler, request, partition);
 

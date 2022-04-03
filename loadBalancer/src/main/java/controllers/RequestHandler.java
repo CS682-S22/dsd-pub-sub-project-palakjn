@@ -2,6 +2,9 @@ package controllers;
 
 import configuration.Constants;
 import models.*;
+import models.requests.CreateTopicRequest;
+import models.requests.GetBrokerRequest;
+import models.requests.Request;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import utilities.JSONDesrializer;
@@ -9,9 +12,7 @@ import utilities.LBPacketHandler;
 
 import java.io.IOException;
 import java.net.Socket;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -84,7 +85,7 @@ public class RequestHandler {
             if (broker != null && broker.isValid()) {
                 if (action == Constants.TYPE.ADD.getValue()) {
                     logger.warn(String.format("[%s:%d] Received JOIN request from the broker. Adding the broker to the collection.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                    CacheManager.addBroker(broker);
+                    broker = CacheManager.addBroker(broker);
 
                     //Sending response to the broker with the priority number
                     sendJoinResponse(broker);
@@ -114,31 +115,23 @@ public class RequestHandler {
         byte[] response = null;
 
         if (body != null) {
-            Request request = JSONDesrializer.fromJson(body, Request.class);
+            Request<GetBrokerRequest> request = JSONDesrializer.fromJson(body, Request.class);
+            GetBrokerRequest getBrokerRequest = null;
 
-            if (request != null && request.isValid()) {
-                if (request.getType() == Constants.REQUEST.TOPIC.getValue()) {
-                    //Requesting for the entire topic
-                    logger.info(String.format("[%s:%d] Received request to get all the broker information's handling the topic %s", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getTopicName()));
-                    if (CacheManager.isTopicExist(request.getTopicName())) {
-                        Topic topic = CacheManager.getTopic(request.getTopicName());
-                        response = LBPacketHandler.createPacket(Constants.TYPE.RESP, topic);
-                    } else {
-                        //Topic don't exist
-                        logger.warn(String.format("[%s:%d] There is no topic with the name %s exit. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getTopicName()));
-                        hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER);
-                    }
+            if (request != null) {
+                getBrokerRequest = request.getRequest();
+            }
+
+            if (getBrokerRequest != null && getBrokerRequest.isValid()) {
+                //Requesting for a partition
+                logger.info(String.format("[%s:%d] Received request to get the broker information of a particular partition %d of a topic %s.", connection.getDestinationIPAddress(), connection.getDestinationPort(), getBrokerRequest.getPartition(), getBrokerRequest.getName()));
+                if (CacheManager.isPartitionExist(getBrokerRequest.getName(), getBrokerRequest.getPartition())) {
+                    Partition partition = CacheManager.getPartition(getBrokerRequest.getName(), getBrokerRequest.getPartition());
+                    response = LBPacketHandler.createPacket(Constants.TYPE.RESP, partition);
                 } else {
-                    //Requesting for a partition
-                    logger.info(String.format("[%s:%d] Received request to get the broker information of a particular partition %d of a topic %s.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getPartition(), request.getTopicName()));
-                    if (CacheManager.isPartitionExist(request.getTopicName(), request.getPartition())) {
-                        Partition partition = CacheManager.getPartition(request.getTopicName(), request.getPartition());
-                        response = LBPacketHandler.createPacket(Constants.TYPE.RESP, partition);
-                    } else {
-                        //Partition don't exit
-                        logger.warn(String.format("[%s:%d] There is no partition %d of the topic with the name as %s. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getPartition(), request.getTopicName()));
-                        hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER);
-                    }
+                    //Partition don't exit
+                    logger.warn(String.format("[%s:%d] There is no partition %d of the topic with the name as %s. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), getBrokerRequest.getPartition(), getBrokerRequest.getName()));
+                    hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER);
                 }
             } else {
                 logger.warn(String.format("[%s:%d] Received invalid request from the another end. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort()));
@@ -158,11 +151,16 @@ public class RequestHandler {
         byte[] body = LBPacketHandler.getData(message);
 
         if (body != null) {
-            Topic topic = JSONDesrializer.fromJson(body, Topic.class);
+            Request<CreateTopicRequest> request = JSONDesrializer.fromJson(body, Request.class);
+            CreateTopicRequest topicRequest = null;
 
-            if (topic != null && topic.isValid() && topic.getNumOfPartitions() > 0) {
+            if (request != null && request.getRequest() != null) {
+                topicRequest = request.getRequest();
+            }
+
+            if (topicRequest != null && topicRequest.isValid()) {
                 if (action == Constants.TYPE.ADD.getValue()) {
-                    createTopic(topic);
+                    createTopic(topicRequest);
                 } else {
                     logger.warn(String.format("[%s:%d] Received unsupported action %d for the topic related service. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), action));
                     hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
@@ -179,7 +177,7 @@ public class RequestHandler {
      * Allocate partitions to the available broker based on the load on each.
      * Send topic-partition information to brokers which are going to handle them.
      */
-    private synchronized void createTopic(Topic topic) {
+    private synchronized void createTopic(CreateTopicRequest topic) {
         if (CacheManager.isTopicExist(topic.getName())) {
             logger.warn(String.format("[%s:%d] Topic with the name %s already exist. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
             hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);

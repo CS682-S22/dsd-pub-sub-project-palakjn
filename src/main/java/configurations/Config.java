@@ -2,6 +2,7 @@ package configurations;
 
 import models.Host;
 import models.Topic;
+import models.requests.CreateTopicRequest;
 
 import java.util.List;
 
@@ -12,7 +13,7 @@ import java.util.List;
 public class Config {
     private Host loadBalancer;
     private boolean createTopic;
-    private List<Topic> topicsToCreate;
+    private List<CreateTopicRequest> topicsToCreate;
     private boolean isProducer;
     private boolean isConsumer;
     private List<TopicConfig> topics;
@@ -36,7 +37,7 @@ public class Config {
     /**
      * Get the topics list to create
      */
-    public List<Topic> getTopicsToCreate() {
+    public List<CreateTopicRequest> getTopicsToCreate() {
         return topicsToCreate;
     }
 

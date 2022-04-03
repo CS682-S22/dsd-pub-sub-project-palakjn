@@ -4,8 +4,9 @@ import configuration.Constants;
 import configurations.BrokerConstants;
 import models.File;
 import models.Header;
-import models.Request;
 import models.Segment;
+import models.requests.TopicReadWriteRequest;
+import models.requests.Request;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import utilities.BrokerPacketHandler;
@@ -42,12 +43,12 @@ public class ConsumerHandler {
             if (header.getType() != BrokerConstants.TYPE.ADD.getValue() && header.getType() != BrokerConstants.TYPE.PULL.getValue()) {
                 logger.warn(String.format("[%s:%d] Received invalid request %s from the consumer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), BrokerConstants.findTypeByValue(header.getType()), connection.getDestinationIPAddress(), connection.getDestinationPort()));
             } else {
-                Request request = JSONDesrializer.fromJson(body, Request.class);
+                Request<TopicReadWriteRequest> request = JSONDesrializer.fromJson(body, Request.class);
 
-                if (validateRequest(header, request)) {
+                if (request != null && validateRequest(header, request.getRequest())) {
                     if (header.getType() == BrokerConstants.TYPE.PULL.getValue()) {
                         method = BrokerConstants.METHOD.PULL;
-                        processPullRequest(request);
+                        processPullRequest(request.getRequest());
 
                         connection.closeConnection();
                     } else {
@@ -56,7 +57,7 @@ public class ConsumerHandler {
                         CacheManager.addSubscriber(subscriber);
 
                         method = Constants.METHOD.PUSH;
-                        processRequest(request);
+                        processRequest(request.getRequest());
                     }
                 }
             }
@@ -66,19 +67,19 @@ public class ConsumerHandler {
     /**
      * Validates whether the received request is valid, if broker holding partition information of the requested topic.
      */
-    private boolean validateRequest(Header.Content header, Request request) {
+    private boolean validateRequest(Header.Content header, TopicReadWriteRequest request) {
         boolean isValid = false;
 
         if (request != null && request.isValid()) {
-            logger.debug(String.format("[%s:%d] Received [%s] request to get the data of topic %s - partition %d - offset - %d from the consumer %s:%d", connection.getSourceIPAddress(), connection.getSourcePort(), BrokerConstants.findTypeByValue(header.getType()), request.getTopicName(), request.getPartition(), request.getOffset(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
+            logger.debug(String.format("[%s:%d] Received [%s] request to get the data of topic %s - partition %d - offset - %d from the consumer %s:%d", connection.getSourceIPAddress(), connection.getSourcePort(), BrokerConstants.findTypeByValue(header.getType()), request.getName(), request.getPartition(), request.getOffset(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
 
-            if (CacheManager.isExist(request.getTopicName(), request.getPartition())) {
-                logger.warn(String.format("[%s:%d] [%s] Broker holding the topic %s - partition %d information.", connection.getSourceIPAddress(), connection.getSourcePort(), BrokerConstants.findTypeByValue(header.getType()), request.getTopicName(), request.getPartition()));
+            if (CacheManager.isExist(request.getName(), request.getPartition())) {
+                logger.warn(String.format("[%s:%d] [%s] Broker holding the topic %s - partition %d information.", connection.getSourceIPAddress(), connection.getSourcePort(), BrokerConstants.findTypeByValue(header.getType()), request.getName(), request.getPartition()));
                 hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
 
                 isValid = true;
             } else {
-                logger.warn(String.format("[%s:%d] Broker not holding the topic %s - partition %d information.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getTopicName(), request.getPartition()));
+                logger.warn(String.format("[%s:%d] Broker not holding the topic %s - partition %d information.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getName(), request.getPartition()));
                 hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER);
             }
         } else {
@@ -92,7 +93,7 @@ public class ConsumerHandler {
     /**
      * Process pull request where it sends the requested number of logs and again read for new PULL request
      */
-    private void processPullRequest(Request request) {
+    private void processPullRequest(TopicReadWriteRequest request) {
         while (connection.isOpen()) {
             processRequest(request);
 
@@ -103,10 +104,10 @@ public class ConsumerHandler {
     /**
      * Receive pull request from consumer, return request if it is a valid request else null
      */
-    private Request receivePullRequest() {
-        Request request = null;
+    private TopicReadWriteRequest receivePullRequest() {
+        TopicReadWriteRequest readTopicRequest = null;
 
-        while (request == null) {
+        while (readTopicRequest == null) {
             byte[] packet = connection.receive();
 
             if (packet != null) {
@@ -116,24 +117,24 @@ public class ConsumerHandler {
                     byte[] body = BrokerPacketHandler.getData(packet);
 
                     if (body != null) {
-                        request = JSONDesrializer.fromJson(body, Request.class);
+                        Request<TopicReadWriteRequest> request = JSONDesrializer.fromJson(body, Request.class);
 
-                        if (!validateRequest(header, request)) {
-                            request = null;
+                        if (request != null && validateRequest(header, request.getRequest())) {
+                            readTopicRequest = request.getRequest();
                         }
                     }
                 }
             }
         }
 
-        return request;
+        return readTopicRequest;
     }
 
     /**
      * Send the logs if available from the requested offset. Send NACK if requested offset is more than the available data.
      */
-    private void processRequest(Request request) {
-        File partition = CacheManager.getPartition(request.getTopicName(), request.getPartition());
+    private void processRequest(TopicReadWriteRequest request) {
+        File partition = CacheManager.getPartition(request.getName(), request.getPartition());
 
         int segmentNumber = getSegmentNumber(request, partition);
 
@@ -148,7 +149,7 @@ public class ConsumerHandler {
     /**
      * Get the segment number which contains the requested offset. If exact offset don't exist then, return the segment number which contains the offset which is just less than the given offset
      */
-    private int getSegmentNumber(Request request, File partition) {
+    private int getSegmentNumber(TopicReadWriteRequest request, File partition) {
         int segmentNumber = partition.getSegmentNumber(request.getOffset());
         if (segmentNumber == -1) {
             //Exact offset not found. Getting the offset which is less than the given offset.
@@ -160,7 +161,7 @@ public class ConsumerHandler {
                 //Getting again segment number with new rounded offset
                 segmentNumber = partition.getSegmentNumber(request.getOffset());
             } else {
-                logger.warn(String.format("[%s:%d] [%s] No offset %d found for the topic %s - partition %d information.", connection.getDestinationIPAddress(), connection.getDestinationPort(), method != null ? method.name() : null, request.getOffset(), request.getTopicName(), request.getPartition()));
+                logger.warn(String.format("[%s:%d] [%s] No offset %d found for the topic %s - partition %d information.", connection.getDestinationIPAddress(), connection.getDestinationPort(), method != null ? method.name() : null, request.getOffset(), request.getName(), request.getPartition()));
             }
         }
 
@@ -172,7 +173,7 @@ public class ConsumerHandler {
      * If the method is PUSH then, send all the logs from the available segments.
      * If the method is PULL then, send only the requested amount of logs.
      */
-    private void sendPartition(Request request, File partition, int segmentNumber) {
+    private void sendPartition(TopicReadWriteRequest request, File partition, int segmentNumber) {
         List<Segment> segments = partition.getSegmentsFrom(segmentNumber);
         int count = 0;
 
