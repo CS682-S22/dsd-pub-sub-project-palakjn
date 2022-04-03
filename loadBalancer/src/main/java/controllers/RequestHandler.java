@@ -9,7 +9,9 @@ import utilities.LBPacketHandler;
 
 import java.io.IOException;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -177,40 +179,37 @@ public class RequestHandler {
      * Allocate partitions to the available broker based on the load on each.
      * Send topic-partition information to brokers which are going to handle them.
      */
-    private void createTopic(Topic topic) {
+    private synchronized void createTopic(Topic topic) {
         if (CacheManager.isTopicExist(topic.getName())) {
             logger.warn(String.format("[%s:%d] Topic with the name %s already exist. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
             hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
-        } else if (CacheManager.getNumberOfBrokers() == 0) {
-            logger.warn(String.format("[%s:%d] No brokers joined the network yet. Not able to create the topic with the name %s. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
+        } else if (CacheManager.getNumberOfBrokers() < (topic.getNumOfFollowers() + 1)) {
+            logger.warn(String.format("[%s:%d] Less number of brokers %d available for creating topic with the name %s. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), CacheManager.getNumberOfBrokers(), topic.getName()));
             hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
         } else {
             logger.debug(String.format("[%s:%d] Request received for distributing %d number of partitions of topic %s among %d number of brokers", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getNumOfPartitions(), topic.getName(), CacheManager.getNumberOfBrokers()));
-            Topic newTopic = new Topic(topic.getName());
+            Topic newTopic = new Topic(topic.getName(), topic.getNumOfFollowers());
 
             for (int index = 0; index < topic.getNumOfPartitions(); index++) {
-                Host broker = CacheManager.findBrokerWithLessLoad();
-                Partition partition = new Partition(topic.getName(), index, broker);
+                //Getting brokers which will handle the partition of the topic
+                Brokers brokers = CacheManager.findBrokersWithLessLoad(topic.getNumOfFollowers() + 1);
+
+                //Creating new partition and adding to the topic
+                Partition partition = new Partition(topic.getName(), index, brokers.getLeader(), brokers.getBrokers());
                 newTopic.addPartition(partition);
 
                 //logging
-                String log = String.format("[%s:%d] Broker %s:%d handling Topic %s - Partition %d.", connection.getDestinationIPAddress(), connection.getDestinationPort(), broker.getAddress(), broker.getPort(), topic.getName(), index);
+                String log = String.format("[%s:%d] Brokers: {%s} handling Topic %s - Partition %d.", connection.getDestinationIPAddress(), connection.getDestinationPort(), brokers, topic.getName(), index);
                 logger.info(log);
                 System.out.println(log);
             }
 
-            boolean flag = CacheManager.addTopic(newTopic);
-            if (flag) {
-                sendAck();
-                logger.debug(String.format("[%s:%d] Created topic %s with %d number of partitions. Sending the information to the respective brokers.",connection.getDestinationIPAddress(), connection.getDestinationPort(), newTopic.getName(), newTopic.getNumOfPartitions()));
+            CacheManager.addTopic(newTopic);
+            sendAck();
+            logger.debug(String.format("[%s:%d] Created topic %s with %d number of partitions. Sending the information to the respective brokers.",connection.getDestinationIPAddress(), connection.getDestinationPort(), newTopic.getName(), newTopic.getNumOfPartitions()));
 
-                //Send partition information to all the brokers asynchronously. Assuming that all the brokers might be up and running
-                sendToBrokers(newTopic);
-            } else {
-                //Two requests for creating topic with same name might have received. Another thread might have added that topic before.
-                logger.warn(String.format("[%s:%d] Another instance might have created same topic. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
-            }
+            //Send partition information to all the brokers asynchronously. Assuming that all the brokers might be up and running
+            sendToBrokers(newTopic);
         }
     }
 
@@ -236,7 +235,7 @@ public class RequestHandler {
      */
     private void sendToBroker(Topic topic) {
         try {
-            Host brokerInfo = topic.getPartitions().get(0).getBroker();
+            Host brokerInfo = topic.getPartitions().get(0).getLeader();
             Socket socket = new Socket(brokerInfo.getAddress(), brokerInfo.getPort());
             Connection connection = new Connection(socket, brokerInfo.getAddress(), brokerInfo.getPort(), this.connection.getSourceIPAddress(), this.connection.getSourcePort());
             if (connection.openConnection()) {

@@ -1,5 +1,6 @@
 package controllers;
 
+import models.Brokers;
 import models.Host;
 import models.Partition;
 import models.Topic;
@@ -56,26 +57,32 @@ public class CacheManager {
     }
 
     /**
-     * Find the broker which is holding less number of partitions.
+     * Find the n number of brokers which is holding less numb of partitions.
      */
-    public static Host findBrokerWithLessLoad() {
-        Host broker;
+    public static Brokers findBrokersWithLessLoad(int num) {
+        Brokers brokersWithLessLoad = new Brokers();
         brokerLock.writeLock().lock();
 
-        broker = brokers.get(0);
-        int min = broker.getNumberOfPartitions();
+        if (brokers.size() > 0) {
+            for (int i = 1; i <= num; i++) {
+                Host broker = brokers.get(0);
+                int min = Integer.MAX_VALUE;
 
-        for (int index = 1; index < brokers.size(); index++) {
-            if (brokers.get(index).getNumberOfPartitions() < min) {
-                broker = brokers.get(index);
-                min = broker.getNumberOfPartitions();
+                for (Host host : brokers) {
+                    if (!brokersWithLessLoad.contains(host) && host.getNumberOfPartitions() < min) {
+                        broker = host;
+                        min = broker.getNumberOfPartitions();
+                    }
+                }
+
+                broker.incrementNumOfPartitions();
+
+                brokersWithLessLoad.add(broker);
             }
         }
 
-        broker.incrementNumOfPartitions();
-
         brokerLock.writeLock().unlock();
-        return broker;
+        return brokersWithLessLoad;
     }
 
     /**
@@ -107,22 +114,16 @@ public class CacheManager {
     /**
      * Add new topic to the collection.
      */
-    public static boolean addTopic(Topic topic) {
-        boolean flag = false;
+    public static void addTopic(Topic topic) {
         topicLock.writeLock().lock();
 
-        if (!topicMap.containsKey(topic.getName())) {
-            topicMap.put(topic.getName(), topic);
+        topicMap.put(topic.getName(), topic);
 
-            for (Partition partition : topic.getPartitions()) {
-                partitionMap.put(partition.getString(), partition);
-            }
-
-            flag = true;
+        for (Partition partition : topic.getPartitions()) {
+            partitionMap.put(partition.getString(), partition);
         }
 
         topicLock.writeLock().unlock();
-        return flag;
     }
 
     /**

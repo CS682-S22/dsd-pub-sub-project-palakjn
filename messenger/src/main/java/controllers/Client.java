@@ -49,8 +49,8 @@ public class Client {
 
         Partition partition = getBroker(packet);
 
-        if (partition != null && partition.getBroker() != null && partition.getBroker().isValid()) {
-            broker = partition.getBroker();
+        if (partition != null && partition.getLeader() != null && partition.getLeader().isValid()) {
+            broker = partition.getLeader();
             isSuccess = true;
             logger.info(String.format("[%s] Received broker information: %s:%d which is holding the information of topic %s - partition %d.", hostName, broker.getAddress(), broker.getPort(), topic, partitionNum));
         } else {
