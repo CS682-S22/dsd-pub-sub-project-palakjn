@@ -1,7 +1,6 @@
 package utilities;
 
 import configurations.AppConstants;
-import models.Topic;
 import models.requests.CreateTopicRequest;
 import models.requests.Request;
 
@@ -16,8 +15,8 @@ public class AppPacketHandler extends PacketHandler {
      * Create packet to add topic
      */
     public static byte[] createAddTopicPacket(CreateTopicRequest topicRequest, int seqNum) {
-        Request<CreateTopicRequest> request = new Request<>(topicRequest);
+        Request<CreateTopicRequest> request = new Request<>(AppConstants.REQUEST_TYPE.ADD, topicRequest);
 
-        return createPacket(AppConstants.REQUESTER.TOPIC, AppConstants.TYPE.ADD, request, seqNum);
+        return createPacket(AppConstants.REQUESTER.TOPIC, AppConstants.TYPE.REQ, request, seqNum);
     }
 }

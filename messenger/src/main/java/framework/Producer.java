@@ -30,10 +30,10 @@ public class Producer extends Client {
     public void send(String topic, int key, byte[] data) {
         if (!isConnected) {
             byte[] lbPacket = PacketHandler.createGetBrokerReq(Constants.REQUESTER.PRODUCER, topic, key);
-            byte[] brokerRequest = PacketHandler.createToBrokerRequest(Constants.REQUESTER.PRODUCER, Constants.TYPE.ADD, topic, key);
+            byte[] brokerRequest = PacketHandler.createToBrokerRequest(Constants.REQUESTER.PRODUCER, Constants.TYPE.REQ, topic, key);
 
             if ((broker != null ||
-                    getBroker(lbPacket, topic, key)) && connectToBroker(brokerRequest, Constants.TYPE.ADD.name())) {
+                    getBroker(lbPacket, topic, key)) && connectToBroker(brokerRequest, Constants.TYPE.REQ.name())) {
                 isConnected = true;
 
                 threadPool.execute(this::send);

@@ -1,6 +1,5 @@
 package controllers;
 
-import configuration.Constants;
 import configurations.BrokerConstants;
 import models.File;
 import models.Header;
@@ -40,7 +39,7 @@ public class ConsumerHandler {
         byte[] body = BrokerPacketHandler.getData(message);
 
         if (body != null) {
-            if (header.getType() != BrokerConstants.TYPE.ADD.getValue() && header.getType() != BrokerConstants.TYPE.PULL.getValue()) {
+            if (header.getType() != BrokerConstants.TYPE.SUB.getValue() && header.getType() != BrokerConstants.TYPE.PULL.getValue()) {
                 logger.warn(String.format("[%s:%d] Received invalid request %s from the consumer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), BrokerConstants.findTypeByValue(header.getType()), connection.getDestinationIPAddress(), connection.getDestinationPort()));
             } else {
                 Request<TopicReadWriteRequest> request = JSONDesrializer.fromJson(body, Request.class);
@@ -56,7 +55,7 @@ public class ConsumerHandler {
                         subscriber = new Subscriber(connection);
                         CacheManager.addSubscriber(subscriber);
 
-                        method = Constants.METHOD.PUSH;
+                        method = BrokerConstants.METHOD.PUSH;
                         processRequest(request.getRequest());
                     }
                 }

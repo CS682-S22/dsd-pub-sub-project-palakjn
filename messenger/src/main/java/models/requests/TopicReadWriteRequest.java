@@ -2,6 +2,11 @@ package models.requests;
 
 import utilities.Strings;
 
+/**
+ * Responsible for holding values for reading/writing data from/into partition of topic.
+ *
+ * @author Palak Jain
+ */
 public class TopicReadWriteRequest {
     private String name;
     private int partition;

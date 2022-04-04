@@ -7,6 +7,7 @@ import controllers.RequestHandler;
 import models.Header;
 import models.Host;
 import models.Topic;
+import models.requests.Request;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import utilities.PacketHandler;
@@ -148,28 +149,30 @@ public class RequestHandlerTest {
      * Create and send request to add new broker
      */
     private void sendReqToAddBroker(Connection connection, Host broker) {
-        byte[] packet = PacketHandler.createPacket(Constants.REQUESTER.BROKER, Constants.TYPE.ADD, broker);
-        sendReqToAddRemBroker(connection, packet, Constants.TYPE.ADD.getValue());
+        Request<Host> request = new Request<>(Constants.REQUEST_TYPE.ADD, broker);
+        byte[] packet = PacketHandler.createPacket(Constants.REQUESTER.BROKER, Constants.TYPE.REQ, request);
+        sendReqToAddRemBroker(connection, packet);
     }
 
     /**
      * Create and send request to remove broker
      */
     private void sendReqToRemBroker(Connection connection, Host broker) {
-        byte[] packet = PacketHandler.createPacket(Constants.REQUESTER.BROKER, Constants.TYPE.REM, broker);
-        sendReqToAddRemBroker(connection, packet, Constants.TYPE.REM.getValue());
+        Request<Host> request = new Request<>(Constants.REQUEST_TYPE.REM, broker);
+        byte[] packet = PacketHandler.createPacket(Constants.REQUESTER.BROKER, Constants.TYPE.REQ, request);
+        sendReqToAddRemBroker(connection, packet);
     }
 
     /**
      * Send add/remove request to broker
      */
-    private void sendReqToAddRemBroker(Connection connection, byte[] packet, int action) {
+    private void sendReqToAddRemBroker(Connection connection, byte[] packet) {
         RequestHandler requestHandler = new RequestHandler(connection);
 
         try {
             Method processMethod = RequestHandler.class.getDeclaredMethod("processBrokerRequest", byte[].class, int.class);
             processMethod.setAccessible(true);
-            processMethod.invoke(requestHandler, packet, action);
+            processMethod.invoke(requestHandler, packet);
 
         } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException exception) {
             System.err.println(exception.getMessage());

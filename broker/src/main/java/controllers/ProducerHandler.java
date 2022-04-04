@@ -30,7 +30,7 @@ public class ProducerHandler {
      * Process the request from producer based on the action.
      */
     public void processRequest(Header.Content header, byte[] message) {
-        if (header.getType() == BrokerConstants.TYPE.ADD.getValue()) {
+        if (header.getType() == BrokerConstants.TYPE.REQ.getValue()) {
             byte[] body = BrokerPacketHandler.getData(message);
 
             if (body != null) {
@@ -93,8 +93,8 @@ public class ProducerHandler {
                         } else {
                             logger.warn(String.format("[%s:%d] Received empty data from producer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
                         }
-                    } else if (header.getType() == BrokerConstants.TYPE.ADD.getValue()) {
-                        logger.info(String.format("[%s:%d] Received ADD request from producer %s:%d again. Sending ACK as ACK might have lost before.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                    } else if (header.getType() == BrokerConstants.TYPE.REQ.getValue()) {
+                        logger.info(String.format("[%s:%d] Received REQ request from producer %s:%d again. Sending ACK as ACK might have lost before.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
                         hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                     }
                 } else {

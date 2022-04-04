@@ -2,6 +2,11 @@ package models.requests;
 
 import utilities.Strings;
 
+/**
+ * Responsible for holding values for getting broker details holding partition information of topic.
+ *
+ * @author Palak Jain
+ */
 public class GetBrokerRequest {
     private String name;
     private int partition;

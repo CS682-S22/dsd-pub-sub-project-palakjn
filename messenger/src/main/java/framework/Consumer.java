@@ -61,7 +61,7 @@ public class Consumer extends Client {
         if (method == Constants.METHOD.PULL) {
             brokerRequest = PacketHandler.createToBrokerRequest(Constants.REQUESTER.CONSUMER, Constants.TYPE.PULL, topic, key, offset, Constants.CONSUMER_MAX_PULL_SIZE);
         } else { //POST
-            brokerRequest = PacketHandler.createToBrokerRequest(Constants.REQUESTER.CONSUMER, Constants.TYPE.ADD, topic, key, offset);
+            brokerRequest = PacketHandler.createToBrokerRequest(Constants.REQUESTER.CONSUMER, Constants.TYPE.SUB, topic, key, offset);
         }
 
         //Get the broker and connect to the broker

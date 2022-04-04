@@ -41,9 +41,8 @@ public class Constants {
         NACK(4), //Negative Acknowledgement
         DATA(5),
         PULL(6),
-        ADD(7),  //Join or Subscribe
-        REM(8),  //Remove
-        FIN(9);
+        SUB(7),  //Subscribe
+        FIN(8);
 
         private final int value;
         TYPE(int value) {
@@ -135,5 +134,12 @@ public class Constants {
             }
         }
         return result;
+    }
+
+    public static class REQUEST_TYPE {
+        public static String ADD = "ADD";
+        public static String REM = "REMOVE";
+        public static String FAIL = "FAIL";
+        public static String LEADER = "NEW LEADER";
     }
 }

@@ -2,6 +2,7 @@ package utilities;
 
 import configurations.BrokerConstants;
 import models.Host;
+import models.requests.Request;
 
 import java.nio.ByteBuffer;
 
@@ -15,9 +16,10 @@ public class BrokerPacketHandler extends PacketHandler {
     /**
      * Creates packet ADD/REM to/from the network to send to load balancer
      */
-    public static byte[] createPacket(Host brokerInfo, BrokerConstants.TYPE type) {
+    public static byte[] createPacket(Host brokerInfo, String type) {
+        Request<Host> request = new Request<>(type, brokerInfo);
 
-        return createPacket(BrokerConstants.REQUESTER.BROKER, type, brokerInfo);
+        return createPacket(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.REQ, request);
     }
 
     /**
