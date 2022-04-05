@@ -1,13 +1,14 @@
 package controllers;
 
-import models.Brokers;
-import models.Host;
-import models.Partition;
-import models.Topic;
+import configuration.Constants;
+import models.*;
+import models.requests.FailBrokerRequest;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.stream.Stream;
 
 /**
  * Static global cache alike class storing the configuration of the system.
@@ -48,6 +49,8 @@ public class CacheManager {
             //Incrementing the counter by 1
             counter++;
         } else {
+            //Maybe the broker recover from failure and tries to join the network. Making that broker to active.
+            existingBroker.setActive();
             broker = existingBroker;
         }
 
@@ -73,24 +76,53 @@ public class CacheManager {
 
         if (brokers.size() > 0) {
             for (int i = 1; i <= num; i++) {
-                Host broker = brokers.get(0);
+                Host broker = null;
                 int min = Integer.MAX_VALUE;
 
                 for (Host host : brokers) {
-                    if (!brokersWithLessLoad.contains(host) && host.getNumberOfPartitions() < min) {
+                    if (host.isActive() && !brokersWithLessLoad.contains(host) && host.getNumberOfPartitions() < min) {
                         broker = host;
                         min = broker.getNumberOfPartitions();
                     }
                 }
 
-                broker.incrementNumOfPartitions();
+                if (broker != null) {
+                    broker.incrementNumOfPartitions();
+                }
 
-                brokersWithLessLoad.add(broker);
+                brokersWithLessLoad.add(new Host(broker));
             }
         }
 
         brokerLock.writeLock().unlock();
         return brokersWithLessLoad;
+    }
+
+    /**
+     * Find the new follower with less numb of partitions and the one which is not handling the given partition of the topic
+     */
+    public static Host findNewFollower(Partition partition) {
+        Host follower = null;
+        brokerLock.writeLock().lock();
+
+        int min = Integer.MAX_VALUE;
+
+        for (Host host : brokers) {
+            if (host.isActive() && !partition.contains(host) && host.getNumberOfPartitions() < min) {
+                follower = host;
+                min = host.getNumberOfPartitions();
+            }
+        }
+
+        if (follower != null) {
+            follower.incrementNumOfPartitions();
+            //Creating new object as further updates on the object should not affect original one
+            follower = new Host(follower);
+            follower.setDesignation(Constants.BROKER_DESIGNATION.FOLLOWER.getValue());
+        }
+
+        brokerLock.writeLock().unlock();
+        return follower;
     }
 
     /**
@@ -110,7 +142,7 @@ public class CacheManager {
      * Get the broker object with the given address and port
      */
     public static Host getBroker(String address, int port) {
-        Host broker = null;
+        Host broker;
         brokerLock.readLock().lock();
 
         broker = brokers.stream().filter(host -> host.getAddress().equals(address) && host.getPort() == port).findAny().orElse(null);
@@ -198,19 +230,6 @@ public class CacheManager {
     }
 
     /**
-     * Get the topic by name
-     */
-    public static Topic getTopic(String name) {
-        Topic topic;
-        topicLock.readLock().lock();
-
-        topic = topicMap.getOrDefault(name, null);
-
-        topicLock.readLock().unlock();
-        return topic;
-    }
-
-    /**
      * Get the partition with the given topic name and partition number
      */
     public static Partition getPartition(String name, int partition) {
@@ -234,5 +253,33 @@ public class CacheManager {
 
         topicLock.readLock().unlock();
         return flag;
+    }
+
+    /**
+     * Make failed broker as inactive.
+     * Remove failed broker from partition MD
+     * Get new follower which will handle the partition of the topic
+     */
+    public static Topic updateMDAfterFailure(FailBrokerRequest request) {
+        Host newFollower;
+        topicLock.readLock().lock();
+
+        Partition partition = getPartition(request.getTopic(), request.getPartition());
+        Host broker = getBroker(request.getBroker().getAddress(), request.getBroker().getPort());
+
+        if (broker.isLeader()) {
+            partition.removeLeader();
+        } else {
+            partition.removeFollower(request.getBroker());
+        }
+
+        broker.decrementNumOfPartitions();
+        broker.setInActive();
+
+        newFollower = findNewFollower(partition);
+        partition.addBroker(newFollower);
+
+        topicLock.readLock().unlock();
+        return new Topic(partition.getTopicName(), partition);
     }
 }

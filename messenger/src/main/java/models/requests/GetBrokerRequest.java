@@ -1,5 +1,6 @@
 package models.requests;
 
+import com.google.gson.annotations.Expose;
 import utilities.Strings;
 
 /**
@@ -8,7 +9,9 @@ import utilities.Strings;
  * @author Palak Jain
  */
 public class GetBrokerRequest {
+    @Expose
     private String name;
+    @Expose
     private int partition;
 
     public GetBrokerRequest(String name, int partition) {

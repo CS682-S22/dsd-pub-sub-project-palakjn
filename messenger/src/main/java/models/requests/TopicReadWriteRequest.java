@@ -1,5 +1,6 @@
 package models.requests;
 
+import com.google.gson.annotations.Expose;
 import utilities.Strings;
 
 /**
@@ -8,9 +9,13 @@ import utilities.Strings;
  * @author Palak Jain
  */
 public class TopicReadWriteRequest {
+    @Expose
     private String name;
+    @Expose
     private int partition;
+    @Expose
     private int offset;
+    @Expose
     private int numOfMsg;
 
     public TopicReadWriteRequest(String name, int partition, int offset, int numOfMsg) {

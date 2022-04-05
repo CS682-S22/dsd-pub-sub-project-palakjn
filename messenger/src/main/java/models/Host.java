@@ -1,5 +1,6 @@
 package models;
 
+import com.google.gson.annotations.Expose;
 import configuration.Constants;
 import utilities.Strings;
 
@@ -9,24 +10,39 @@ import utilities.Strings;
  * @author Palak Jain
  */
 public class Host extends Object {
+    @Expose
     private int priorityNum;
+    @Expose
     private String address;
+    @Expose
     private int port;
+    @Expose
+    private int designation; // 0 for leader and 1 for follower
     private int numberOfPartitions; // Number of partitions a corresponding broker holding. [Will be 0 for other type of hosts: producer/consumer/load balancer]
+    private String status; //ACTIVE or INACTIVE
 
     public Host(int priorityNum, String address, int port) {
         this.priorityNum = priorityNum;
         this.address = address;
         this.port = port;
+        status = Constants.BROKER_STATUS.ACTIVE;
     }
 
     public Host(String address, int port) {
         this.address = address;
         this.port = port;
+        status = Constants.BROKER_STATUS.ACTIVE;
+    }
+
+    public Host(Host host) {
+         priorityNum = host.getPriorityNum();
+         address = host.getAddress();
+         port = host.getPort();
+         status = Constants.BROKER_STATUS.ACTIVE;
     }
 
     public Host() {
-
+        status = Constants.BROKER_STATUS.ACTIVE;
     }
 
     /**
@@ -72,6 +88,27 @@ public class Host extends Object {
     }
 
     /**
+     * Decrement the number of partitions by 1
+     */
+    public void decrementNumOfPartitions() {
+        this.numberOfPartitions--;
+    }
+
+    /**
+     * Get whether the host is leader or follower
+     */
+    public int getDesignation() {
+        return designation;
+    }
+
+    /**
+     * Set whether the host is leader or follower
+     */
+    public void setDesignation(int designation) {
+        this.designation = designation;
+    }
+
+    /**
      * Validates if the address is not null and port is in accepted range
      */
     public boolean isValid() {
@@ -85,4 +122,31 @@ public class Host extends Object {
         return String.format("%s:%d", address, port);
     }
 
+    /**
+     * Finds if the broker is leader
+     */
+    public boolean isLeader() {
+        return designation == Constants.BROKER_DESIGNATION.LEADER.getValue();
+    }
+
+    /**
+     * Set the broker as active
+     */
+    public void setActive() {
+        status = Constants.BROKER_STATUS.ACTIVE;
+    }
+
+    /**
+     * Set the broker as inactive
+     */
+    public void setInActive() {
+        status = Constants.BROKER_STATUS.INACTIVE;
+    }
+
+    /**
+     * Checks whether the host is active or inactive
+     */
+    public boolean isActive() {
+        return status.equals(Constants.BROKER_STATUS.ACTIVE);
+    }
 }

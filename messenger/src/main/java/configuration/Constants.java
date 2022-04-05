@@ -142,4 +142,23 @@ public class Constants {
         public static String FAIL = "FAIL";
         public static String LEADER = "NEW LEADER";
     }
+
+    public enum BROKER_DESIGNATION {
+        LEADER(0),
+        FOLLOWER(1);
+
+        private final int value;
+        BROKER_DESIGNATION(int value) {
+            this.value = value;
+        }
+
+        public int getValue() {
+            return value;
+        }
+    }
+
+    public static class BROKER_STATUS {
+        public static String ACTIVE = "ACTIVE";
+        public static String INACTIVE = "INACTIVE";
+    }
 }

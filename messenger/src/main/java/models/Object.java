@@ -1,6 +1,7 @@
 package models;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSyntaxException;
 import utilities.Strings;
 
@@ -20,7 +21,9 @@ public abstract class Object {
         String stringFormat = null;
 
         try {
-            Gson gson = new Gson();
+            Gson gson = new GsonBuilder()
+                    .excludeFieldsWithoutExposeAnnotation()
+                    .create();
             stringFormat = gson.toJson(this);
         } catch (JsonSyntaxException exception) {
             System.out.println("Unable to convert the object to json");

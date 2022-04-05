@@ -1,5 +1,9 @@
 package models;
 
+import com.google.gson.annotations.Expose;
+import configuration.Constants;
+
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -8,16 +12,20 @@ import java.util.List;
  * @author Palak Jain
  */
 public class Partition extends Object {
+    @Expose
     private String topicName;
+    @Expose
     private int number;
+    @Expose
     private Host leader;
+    @Expose
     private List<Host> brokers;
 
     public Partition(String topicName, int number, Host leader, List<Host> brokers) {
         this.topicName = topicName;
         this.number = number;
         this.leader = leader;
-        this.brokers = brokers;
+        this.brokers = new ArrayList<>(brokers);
     }
 
     public Partition(String topicName, int number, Host leader) {
@@ -58,7 +66,7 @@ public class Partition extends Object {
      * Add the broker to the list
      */
     public void addBroker(Host broker) {
-        brokers.add(broker);
+        brokers.add(new Host(broker.getAddress(), broker.getPort()));
     }
 
     /**
@@ -86,5 +94,27 @@ public class Partition extends Object {
      */
     public String getString() {
         return String.format("%s:%d", topicName, number);
+    }
+
+    /**
+     * Remove Leader
+     */
+    public void removeLeader() {
+        leader = null;
+        brokers.removeIf(broker -> broker.getDesignation() == Constants.BROKER_DESIGNATION.LEADER.getValue());
+    }
+
+    /**
+     * Remove the follower
+     */
+    public void removeFollower(Host brokerToRemove) {
+        brokers.removeIf(broker -> broker.getAddress().equals(brokerToRemove.getAddress()) && broker.getPort() == brokerToRemove.getPort());
+    }
+
+    /**
+     * Checks if the broker handling the current partition
+     */
+    public boolean contains(Host broker) {
+        return brokers.stream().anyMatch(host -> host.getAddress().equals(broker.getAddress()) && host.getPort() == broker.getPort());
     }
 }

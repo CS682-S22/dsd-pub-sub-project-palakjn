@@ -1,5 +1,7 @@
 package models;
 
+import configuration.Constants;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,14 +17,12 @@ public class Brokers {
         brokers = new ArrayList<>();
     }
 
-    public Brokers(List<Host> brokers) {
-        this.brokers = brokers;
-    }
-
     /**
      * Adding new broker to the collection
      */
-    public void add(Host broker) {
+    public void add(Host host) {
+        Host broker = new Host(host);
+        broker.setDesignation(Constants.BROKER_DESIGNATION.FOLLOWER.getValue());
         brokers.add(broker);
     }
 
@@ -56,9 +56,13 @@ public class Brokers {
 
         for (Host host : brokers) {
             if (host.getPriorityNum() > max) {
-                leader = host;
+                leader = new Host(host);
                 max = host.getPriorityNum();
             }
+        }
+
+        if (leader != null) {
+            leader.setDesignation(Constants.BROKER_DESIGNATION.LEADER.getValue());
         }
 
         return leader;

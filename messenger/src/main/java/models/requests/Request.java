@@ -1,5 +1,6 @@
 package models.requests;
 
+import com.google.gson.annotations.Expose;
 import models.Object;
 
 /**
@@ -8,7 +9,9 @@ import models.Object;
  * @author Palak Jain
  */
 public class Request<T> extends Object {
+    @Expose
     private String type;
+    @Expose
     private T request;
 
     public Request(T request) {

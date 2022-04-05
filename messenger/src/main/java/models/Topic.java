@@ -1,8 +1,10 @@
 package models;
 
+import com.google.gson.annotations.Expose;
 import utilities.Strings;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
@@ -12,22 +14,28 @@ import java.util.List;
  * @author Palak Jain
  */
 public class Topic extends Object {
+    @Expose
     private String name;
+    @Expose
     private int numOfPartitions;
-    private int numOfFollowers;
+    @Expose
     private List<Partition> partitions;
 
-    public Topic(String name, int numOfFollowers) {
+    public Topic(String name, int numOfPartitions) {
         this.name = name;
-        this.numOfFollowers = numOfFollowers;
+        this.numOfPartitions = numOfPartitions;
         this.partitions = new ArrayList<>();
     }
 
-    public Topic(String name, int numOfPartitions, int numOfFollowers) {
+    public Topic(String name) {
         this.name = name;
-        this.numOfPartitions = numOfPartitions;
-        this.numOfFollowers = numOfFollowers;
         this.partitions = new ArrayList<>();
+    }
+
+    public Topic(String name, Partition partition) {
+        this.name = name;
+        this.partitions = new ArrayList<>();
+        addPartition(partition);
     }
 
     /**
@@ -42,13 +50,6 @@ public class Topic extends Object {
      */
     public int getNumOfPartitions() {
         return numOfPartitions;
-    }
-
-    /**
-     * Get the number of followers
-     */
-    public int getNumOfFollowers() {
-        return numOfFollowers;
     }
 
     /**
@@ -86,7 +87,7 @@ public class Topic extends Object {
             for (int i = 0; i < partition.getTotalBrokers(); i++) {
                 String key = partition.getBroker(i).getString();
                 if (!result.containsKey(key)) {
-                    result.put(key, new Topic(name, numOfFollowers));
+                    result.put(key, new Topic(name));
                 }
 
                 Partition newPartition = new Partition(partition.getTopicName(), partition.getNumber(), partition.getLeader());

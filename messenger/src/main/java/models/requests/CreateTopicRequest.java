@@ -1,5 +1,6 @@
 package models.requests;
 
+import com.google.gson.annotations.Expose;
 import utilities.Strings;
 
 /**
@@ -8,8 +9,11 @@ import utilities.Strings;
  * @author Palak Jain
  */
 public class CreateTopicRequest {
+    @Expose
     private String name;
+    @Expose
     private int numOfPartitions;
+    @Expose
     private int numOfFollowers;
 
     public CreateTopicRequest(String name, int numOfPartitions, int numOfFollowers) {
