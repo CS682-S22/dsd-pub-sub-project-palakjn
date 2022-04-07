@@ -220,45 +220,6 @@ public class CacheManager {
     }
 
     /**
-     * Checks whether topic exist
-     */
-    public static boolean isTopicExist(String topic) {
-        boolean flag;
-        topicLock.readLock().lock();
-
-        flag = topicMap.containsKey(topic);
-
-        topicLock.readLock().unlock();
-        return flag;
-    }
-
-    /**
-     * Get the partition with the given topic name and partition number
-     */
-    public static Partition getPartition(String name, int partition) {
-        Partition part;
-        topicLock.readLock().lock();
-
-        part = partitionMap.getOrDefault(String.format("%s:%s", name, partition), null);
-
-        topicLock.readLock().unlock();
-        return part;
-    }
-
-    /**
-     * Checks whether partition with the given topic name and partition number exists or not
-     */
-    public static boolean isPartitionExist(String name, int partition) {
-        boolean flag;
-        topicLock.readLock().lock();
-
-        flag = partitionMap.containsKey(String.format("%s:%s", name, partition));
-
-        topicLock.readLock().unlock();
-        return flag;
-    }
-
-    /**
      * Make failed broker as inactive.
      * Remove failed broker from partition MD
      * Get new follower which will handle the partition of the topic
@@ -300,5 +261,58 @@ public class CacheManager {
         logger.debug(String.format("Set broker %s:%d leader of topic %s:%d.", request.getBroker().getAddress(), request.getBroker().getPort(), partition.getTopicName(), partition.getNumber()));
 
         topicLock.writeLock().unlock();
+    }
+
+    /**
+     * Checks whether topic exist
+     */
+    public static boolean isTopicExist(String topic) {
+        boolean flag;
+        topicLock.readLock().lock();
+
+        flag = topicMap.containsKey(topic);
+
+        topicLock.readLock().unlock();
+        return flag;
+    }
+
+    /**
+     * Get the partition with the given topic name and partition number
+     */
+    public static Partition getPartition(String name, int partition) {
+        Partition part;
+        topicLock.readLock().lock();
+
+        part = partitionMap.getOrDefault(String.format("%s:%s", name, partition), null);
+
+        topicLock.readLock().unlock();
+        return part;
+    }
+
+    /**
+     * Checks whether partition with the given topic name and partition number exists or not
+     */
+    public static boolean isPartitionExist(String name, int partition) {
+        boolean flag;
+        topicLock.readLock().lock();
+
+        flag = partitionMap.containsKey(String.format("%s:%s", name, partition));
+
+        topicLock.readLock().unlock();
+        return flag;
+    }
+
+    /**
+     * Get the leader broker handling given topic and partition
+     */
+    public static Host getLeader(String name, int partitionNum) {
+        Host leader;
+        topicLock.readLock().lock();
+
+        Partition partition = getPartition(name, partitionNum);
+        leader = partition.getLeader();
+
+        topicLock.readLock().unlock();
+        return leader;
     }
 }

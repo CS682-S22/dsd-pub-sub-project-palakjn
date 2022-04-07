@@ -6,6 +6,7 @@ import models.requests.CreateTopicRequest;
 import models.requests.BrokerUpdateRequest;
 import models.requests.GetBrokerRequest;
 import models.requests.Request;
+import models.responses.Response;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import utilities.JSONDesrializer;
@@ -140,7 +141,7 @@ public class RequestHandler {
      */
     private void sendBrokerDetails(byte[] message) {
         byte[] body = LBPacketHandler.getData(message);
-        byte[] response = null;
+        byte[] responseBytes = null;
 
         if (body != null) {
             Request<GetBrokerRequest> request = JSONDesrializer.fromJson(body, Request.class);
@@ -154,8 +155,16 @@ public class RequestHandler {
                 //Requesting for a partition
                 logger.info(String.format("[%s:%d] Received request to get the broker information of a particular partition %d of a topic %s.", connection.getDestinationIPAddress(), connection.getDestinationPort(), getBrokerRequest.getPartition(), getBrokerRequest.getName()));
                 if (CacheManager.isPartitionExist(getBrokerRequest.getName(), getBrokerRequest.getPartition())) {
-                    Partition partition = CacheManager.getPartition(getBrokerRequest.getName(), getBrokerRequest.getPartition());
-                    response = LBPacketHandler.createPacket(Constants.TYPE.RESP, partition);
+                    Host leader = CacheManager.getLeader(getBrokerRequest.getName(), getBrokerRequest.getPartition());
+                    Response<Host> response;
+
+                    if (leader != null) {
+                        response = new Response<>(Constants.RESPONSE_STATUS.OK, leader);
+                    } else {
+                        response = new Response<>(Constants.RESPONSE_STATUS.SYN);
+                    }
+
+                    responseBytes = LBPacketHandler.createPacket(Constants.TYPE.RESP, response);
                 } else {
                     //Partition don't exit
                     logger.warn(String.format("[%s:%d] There is no partition %d of the topic with the name as %s. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), getBrokerRequest.getPartition(), getBrokerRequest.getName()));
@@ -167,8 +176,8 @@ public class RequestHandler {
             }
         }
 
-        if (response != null) {
-            connection.send(response);
+        if (responseBytes != null) {
+            connection.send(responseBytes);
         }
     }
 

@@ -1,5 +1,7 @@
 package configuration;
 
+import java.util.List;
+
 /**
  * Responsible for holding constant values to use.
  *
@@ -15,6 +17,7 @@ public class Constants {
     public static int CONSUMER_WAIT_TIME = 10000;
     public static int CONSUMER_MAX_PULL_SIZE = 500;
     public static int PRODUCER_WAIT_TIME = 3000;
+    public static int GET_BROKER_WAIT_TIME = 2000;
 
     public enum REQUESTER {
         LOAD_BALANCER(0),
@@ -161,5 +164,12 @@ public class Constants {
     public static class BROKER_STATUS {
         public static String ACTIVE = "ACTIVE";
         public static String INACTIVE = "INACTIVE";
+    }
+
+    public static class RESPONSE_STATUS {
+        public static String OK = "OK";
+        public static String ERROR = "ERROR";
+        public static String SYN = "SYN";
+        public static List<String> STATUS_LIST = List.of(OK, ERROR, SYN);
     }
 }

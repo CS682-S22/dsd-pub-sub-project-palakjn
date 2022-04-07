@@ -3,8 +3,8 @@ package controllers;
 import configuration.Constants;
 import models.Header;
 import models.Host;
-import models.Partition;
 import models.Properties;
+import models.responses.Response;
 import org.apache.logging.log4j.Logger;
 import utilities.JSONDesrializer;
 import utilities.NodeTimer;
@@ -47,14 +47,14 @@ public class Client {
     protected boolean getBroker(byte[] packet, String topic, int partitionNum) {
         boolean isSuccess = false;
 
-        Partition partition = getBroker(packet);
+        broker = getBroker(packet);
 
-        if (partition != null && partition.getLeader() != null && partition.getLeader().isValid()) {
-            broker = partition.getLeader();
+        if (broker != null && broker.isValid()) {
             isSuccess = true;
             logger.info(String.format("[%s] Received broker information: %s:%d which is holding the information of topic %s - partition %d.", hostName, broker.getAddress(), broker.getPort(), topic, partitionNum));
         } else {
             logger.warn(String.format("[%s] No broker information found which is holding the information of topic %s - partition %d.", hostName, topic, partitionNum));
+            broker = null;
         }
 
         return isSuccess;
@@ -63,8 +63,8 @@ public class Client {
     /**
      * Get the broker information from the load balancer which is holding the partition information of a topic
      */
-    protected Partition getBroker(byte[] packet) {
-        Partition partition = null;
+    protected Host getBroker(byte[] packet) {
+        Host broker = null;
 
         try {
             Socket socket = new Socket(loadBalancer.getAddress(), loadBalancer.getPort());
@@ -99,7 +99,27 @@ public class Client {
 
                                     if (body != null) {
                                         running = false;
-                                        partition = JSONDesrializer.fromJson(body, Partition.class);
+
+                                        Response<Host> response = JSONDesrializer.fromJson(body, Response.class);
+
+                                        if (response != null && response.isValid()) {
+                                            if (response.isInSync()) {
+                                                logger.warn(String.format("[%s] [%s:%d] Received response with status as SYNC from load balancer. Sleeping for %d amount of time and retrying.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort(), Constants.GET_BROKER_WAIT_TIME));
+                                                Thread.sleep(Constants.GET_BROKER_WAIT_TIME);
+                                                connection.send(packet);
+                                                timer.startTimer(Constants.TYPE.REQ.name(), Constants.RTT);
+                                            } else if (response.isOk()) {
+                                                broker = response.getObject();
+                                            } else {
+                                                logger.warn(String.format("[%s] [%s:%d] Received response with invalid status %s from the load balancer. Retrying.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort(), response.getStatus()));
+                                                connection.send(packet);
+                                                timer.startTimer(Constants.TYPE.REQ.name(), Constants.RTT);
+                                            }
+                                        } else {
+                                            logger.warn(String.format("[%s] [%s:%d] Received invalid response from the load balancer. Retrying.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                                            connection.send(packet);
+                                            timer.startTimer(Constants.TYPE.REQ.name(), Constants.RTT);
+                                        }
                                     } else {
                                         logger.warn(String.format("[%s] [%s:%d] Received empty body from the load balancer. Retrying.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort()));
                                         connection.send(packet);
@@ -116,10 +136,12 @@ public class Client {
                 }
             }
         } catch (IOException exception) {
-            logger.error(String.format("[%s:%d] Fail to make connection with the destination.", loadBalancer.getAddress(), loadBalancer.getPort()), exception.getMessage());
+            logger.error(String.format("[%s:%d] Fail to get broker information from load balancer.", loadBalancer.getAddress(), loadBalancer.getPort()), exception.getMessage());
+        } catch (InterruptedException e) {
+            logger.error(String.format("[%s:%d] Interrupted while getting broker information from load balancer.", loadBalancer.getAddress(), loadBalancer.getPort()), e.getMessage());
         }
 
-        return partition;
+        return broker;
     }
 
     /**
