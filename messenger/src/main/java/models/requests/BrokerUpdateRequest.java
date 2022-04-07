@@ -2,13 +2,14 @@ package models.requests;
 
 import com.google.gson.annotations.Expose;
 import models.Host;
+import utilities.Strings;
 
 /**
  * Responsible for holding failed broker information.
  *
  * @author Palak Jain
  */
-public class FailBrokerRequest {
+public class BrokerUpdateRequest {
     @Expose
     private String topic;
     @Expose
@@ -16,7 +17,7 @@ public class FailBrokerRequest {
     @Expose
     private Host broker;
 
-    public FailBrokerRequest(String topic, int partition, Host broker) {
+    public BrokerUpdateRequest(String topic, int partition, Host broker) {
         this.topic = topic;
         this.partition = partition;
         this.broker = broker;
@@ -41,5 +42,12 @@ public class FailBrokerRequest {
      */
     public Host getBroker() {
         return broker;
+    }
+
+    /**
+     * Checks whether the request is valid or not
+     */
+    public boolean isValid() {
+        return !Strings.isNullOrEmpty(topic) && broker != null && broker.isValid();
     }
 }

@@ -2,7 +2,9 @@ package controllers;
 
 import configuration.Constants;
 import models.*;
-import models.requests.FailBrokerRequest;
+import models.requests.BrokerUpdateRequest;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,6 +18,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * @author Palak Jain
  */
 public class CacheManager {
+    private static final Logger logger = LogManager.getLogger(CacheManager.class);
     private static List<Host> brokers = new ArrayList<>();
     private static Map<String, Topic> topicMap = new HashMap<>();            // Map topic name to the topic object. Useful when a customer need to read from all the partitions of a topic
     private static Map<String, Partition> partitionMap = new HashMap<>();    // Map topic name + partition to the partition object. Useful when a customer wants to read from particular topic partition as well as when the producer wants to publish message
@@ -260,26 +263,42 @@ public class CacheManager {
      * Remove failed broker from partition MD
      * Get new follower which will handle the partition of the topic
      */
-    public static Topic updateMDAfterFailure(FailBrokerRequest request) {
+    public static Topic updateMDAfterFailure(BrokerUpdateRequest request) {
         Host newFollower;
-        topicLock.readLock().lock();
+        topicLock.writeLock().lock();
 
         Partition partition = getPartition(request.getTopic(), request.getPartition());
         Host broker = getBroker(request.getBroker().getAddress(), request.getBroker().getPort());
 
-        if (broker.isLeader()) {
+        if (request.getBroker().isLeader()) {
+            logger.debug("Leader is failed");
             partition.removeLeader();
         } else {
-            partition.removeFollower(request.getBroker());
+            logger.debug("Follower is failed");
+            partition.removeFollower(broker);
         }
 
         broker.decrementNumOfPartitions();
         broker.setInActive();
 
         newFollower = findNewFollower(partition);
+        logger.info(String.format("Broker %s:%d will handled topic %s:%d.", newFollower.getAddress(), newFollower.getPort(), partition.getTopicName(), partition.getNumber()));
         partition.addBroker(newFollower);
 
-        topicLock.readLock().unlock();
+        topicLock.writeLock().unlock();
         return new Topic(partition.getTopicName(), partition);
+    }
+
+    /**
+     * Update database to make the given broker as leader for the given partition of the topic
+     */
+    public static void updateLeader(BrokerUpdateRequest request) {
+        topicLock.writeLock().lock();
+
+        Partition partition = getPartition(request.getTopic(), request.getPartition());
+        partition.setLeader(new Host(request.getBroker()));
+        logger.debug(String.format("Set broker %s:%d leader of topic %s:%d.", request.getBroker().getAddress(), request.getBroker().getPort(), partition.getTopicName(), partition.getNumber()));
+
+        topicLock.writeLock().unlock();
     }
 }

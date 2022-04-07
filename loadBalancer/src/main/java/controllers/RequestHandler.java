@@ -3,6 +3,7 @@ package controllers;
 import configuration.Constants;
 import models.*;
 import models.requests.CreateTopicRequest;
+import models.requests.BrokerUpdateRequest;
 import models.requests.GetBrokerRequest;
 import models.requests.Request;
 import org.apache.logging.log4j.LogManager;
@@ -48,7 +49,7 @@ public class RequestHandler {
                 if (header.getRequester() == Constants.REQUESTER.BROKER.getValue()) {
                     if (header.getSeqNum() == curSeq) {
                         logger.info(String.format("[%s:%d] Received request from broker with sequence number: %d", connection.getDestinationIPAddress(), connection.getDestinationPort(), curSeq));
-                        processBrokerRequest(request);
+                        processBrokerRequest(request, Constants.TYPE.values()[header.getType()].name());
                     } else if (header.getSeqNum() < curSeq) {
                         logger.info(String.format("[%s:%d] Received another same request from broker with sequence number: %d. Sending acknowledgement.", connection.getDestinationIPAddress(), connection.getDestinationPort(), curSeq));
                         hostService.sendACK(connection, Constants.REQUESTER.LOAD_BALANCER, header.getSeqNum());
@@ -76,37 +77,59 @@ public class RequestHandler {
     /**
      * Process the request from broker to add/remove it from the network
      */
-    private void processBrokerRequest(byte[] message) {
+    private void processBrokerRequest(byte[] message, String type) {
         byte[] body = LBPacketHandler.getData(message);
 
         if (body != null) {
-            Request<Host> request = JSONDesrializer.fromJson(body, Request.class);
-            Host broker = null;
+            if (type.equals(Constants.TYPE.REQ.name())) {
+                Request<Host> request = JSONDesrializer.fromJson(body, Request.class);
 
-            if (request != null) {
-                broker = request.getRequest();
-            }
+                if (request != null) {
+                    Host broker = request.getRequest();
 
-            if (broker != null && broker.isValid()) {
-                if (request.getType().equalsIgnoreCase(Constants.REQUEST_TYPE.ADD)) {
-                    logger.warn(String.format("[%s:%d] Received JOIN request from the broker. Adding the broker to the collection.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                    broker = CacheManager.addBroker(broker);
+                    if (broker != null && broker.isValid()) {
+                        if (request.getType().equalsIgnoreCase(Constants.REQUEST_TYPE.ADD)) {
+                            logger.warn(String.format("[%s:%d] Received JOIN request from the broker. Adding the broker to the collection.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                            broker = CacheManager.addBroker(broker);
 
-                    //Sending response to the broker with the priority number
-                    sendJoinResponse(broker);
+                            //Sending response to the broker with the priority number
+                            sendJoinResponse(broker);
 
-                    logger.info(String.format("[%s:%d] Added the broker with %d priority number to the collection.", connection.getDestinationIPAddress(), connection.getDestinationPort(), broker.getPriorityNum()));
-                    System.out.printf("Broker %s:%d joined the network.\n", connection.getDestinationIPAddress(), connection.getDestinationPort());
-                } else if (request.getType().equalsIgnoreCase(Constants.REQUEST_TYPE.REM)) {
-                    logger.warn(String.format("[%s:%d] Received REMOVE request from the broker. Removing the broker from the collection.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                    CacheManager.removeBroker(broker);
-                    sendAck();
-                } else {
-                    logger.warn(String.format("[%s:%d] Received unsupported request type %s from the broker. Sending NACK packet.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getType()));
-                    hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
+                            logger.info(String.format("[%s:%d] Added the broker with %d priority number to the collection.", connection.getDestinationIPAddress(), connection.getDestinationPort(), broker.getPriorityNum()));
+                            System.out.printf("Broker %s:%d joined the network.\n", connection.getDestinationIPAddress(), connection.getDestinationPort());
+                        } else if (request.getType().equalsIgnoreCase(Constants.REQUEST_TYPE.REM)) {
+                            logger.warn(String.format("[%s:%d] Received REMOVE request from the broker. Removing the broker from the collection.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                            CacheManager.removeBroker(broker);
+                            sendAck();
+                        } else {
+                            logger.warn(String.format("[%s:%d] Received unsupported request type %s from the broker. Sending NACK packet.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getType()));
+                            hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
+                        }
+                    } else {
+                        logger.warn(String.format("[%s:%d] Received invalid broker information from the broker. Sending NACK packet.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                        hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
+                    }
+                }
+            } else if (type.equals(Constants.TYPE.UPDATE.name())) {
+                Request<BrokerUpdateRequest> request = JSONDesrializer.fromJson(body, Request.class);
+
+                if (request != null) {
+                    BrokerUpdateRequest brokerUpdateRequest = request.getRequest();
+
+                    if (brokerUpdateRequest != null && brokerUpdateRequest.isValid()) {
+                        if (request.getType().equalsIgnoreCase(Constants.REQUEST_TYPE.FAIL)) {
+                            logger.info(String.format("[%s:%d] Received request to indicate the failure of broker %s:%d handling topic %s:%d", connection.getDestinationIPAddress(), connection.getDestinationPort(), brokerUpdateRequest.getBroker().getAddress(), brokerUpdateRequest.getBroker().getPort(), brokerUpdateRequest.getTopic(), brokerUpdateRequest.getPartition()));
+                            Topic topic = CacheManager.updateMDAfterFailure(brokerUpdateRequest);
+
+                            sendToBrokers(topic);
+                        } else if (request.getType().equalsIgnoreCase(Constants.REQUEST_TYPE.LEADER)) {
+                            logger.info(String.format("[%s:%d] Received request to set the broker %s:%d as a leader which will handle the topic %s:%d", connection.getDestinationIPAddress(), connection.getDestinationPort(), brokerUpdateRequest.getBroker().getAddress(), brokerUpdateRequest.getBroker().getPort(), brokerUpdateRequest.getTopic(), brokerUpdateRequest.getPartition()));
+                            CacheManager.updateLeader(brokerUpdateRequest);
+                        }
+                    }
                 }
             } else {
-                logger.warn(String.format("[%s:%d] Received invalid broker information from the broker. Sending NACK packet.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                logger.warn(String.format("[%s:%d] Received unsupported header type %s from the broker. Sending NACK packet.", connection.getDestinationIPAddress(), connection.getDestinationPort(), type));
                 hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
             }
         }
@@ -266,6 +289,9 @@ public class RequestHandler {
         curSeq++;
     }
 
+    /**
+     * Send JOIN response with the priority number to the broker
+     */
     private void sendJoinResponse(Host broker) {
         byte[] response = LBPacketHandler.createJoinResponse(broker.getPriorityNum());
         connection.send(response);

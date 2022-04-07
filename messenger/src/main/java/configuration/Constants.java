@@ -42,7 +42,8 @@ public class Constants {
         DATA(5),
         PULL(6),
         SUB(7),  //Subscribe
-        FIN(8);
+        FIN(8),
+        UPDATE(9);
 
         private final int value;
         TYPE(int value) {

@@ -56,6 +56,13 @@ public class Partition extends Object {
     }
 
     /**
+     * Set the new leader for the partition of the topic
+     */
+    public void setLeader(Host leader) {
+        this.leader = leader;
+    }
+
+    /**
      * Get all the brokers which are holding this partition
      */
     public List<Host> getBrokers() {
