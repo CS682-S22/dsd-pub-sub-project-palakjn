@@ -1,5 +1,9 @@
 package controllers;
 
+import configuration.Constants;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -14,7 +18,7 @@ import java.net.SocketTimeoutException;
  * @author Palak Jain
  */
 public class Connection implements Sender, Receiver {
-
+    private static final Logger logger = LogManager.getLogger(Connection.class);
     private Socket channel;
     protected String destinationIPAddress;
     protected int destinationPort;
@@ -91,6 +95,28 @@ public class Connection implements Sender, Receiver {
      */
     public boolean isOpen() {
         return !isClosed;
+    }
+
+    /**
+     * Set the timeout period on channel read operation
+     */
+    public void setTimer(int timeout) {
+        try {
+            channel.setSoTimeout(timeout);
+        } catch (SocketException e) {
+            logger.error(String.format("[%s:%d] Unable to set wait timer of amount %d. Error: ", destinationIPAddress, destinationPort, timeout), e);
+        }
+    }
+
+    /**
+     * Reset the timeout period on channel read operation
+     */
+    public void resetTimer() {
+        try {
+            channel.setSoTimeout(0);
+        } catch (SocketException e) {
+            logger.error(String.format("[%s:%d] Unable to reset wait timer to 0. Error: ", destinationIPAddress, destinationPort), e);
+        }
     }
 
     /**

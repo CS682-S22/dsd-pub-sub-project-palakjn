@@ -126,6 +126,14 @@ public class PacketHandler {
     }
 
     /**
+     * Create the data packet
+     */
+    public static byte[] createDataPacket(Constants.REQUESTER requester, byte[] data, int seqNum) {
+        byte[] header = createHeader(requester, Constants.TYPE.DATA, seqNum);
+        return ByteBuffer.allocate(4 + header.length + data.length).putInt(header.length).put(header).put(data).array();
+    }
+
+    /**
      * Create request to get broker information which is holding topic-partition information
      */
     public static byte[] createGetBrokerReq(Constants.REQUESTER requester, String topic, int partition) {

@@ -73,8 +73,10 @@ public class ProducerHandler {
      */
     private void receive(File partition) {
         boolean reading = true;
+        //Sequence number of the expecting packet
+        int seqNum = 0;
 
-        while (reading) {
+        while (reading && connection.isOpen()) {
             byte[] message = connection.receive();
 
             if (message != null) {
@@ -82,17 +84,26 @@ public class ProducerHandler {
 
                 if (header != null) {
                     if (header.getType() == BrokerConstants.TYPE.DATA.getValue()) {
-                        byte[] data = BrokerPacketHandler.getData(message);
+                        if (header.getSeqNum() == seqNum) {
+                            byte[] data = BrokerPacketHandler.getData(message);
 
-                        if (data != null) {
-                            partition.write(data);
-                            logger.info(String.format("[%s:%d] Received data from producer %s:%d. Written to the segment.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                            if (data != null) {
+                                partition.write(data);
+                                logger.info(String.format("[%s:%d] Received data %d from producer %s:%d. Written to the segment.", connection.getSourceIPAddress(), connection.getSourcePort(), seqNum, connection.getDestinationIPAddress(), connection.getDestinationPort()));
 
-                            //Sending to all the subscribers
-                            sendToSubscribers(data);
+                                //Sending to all the subscribers.
+                                sendToSubscribers(data);
+                                hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                                seqNum++;
+                            } else {
+                                logger.warn(String.format("[%s:%d] Received empty data %d from producer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), seqNum, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                            }
+                        } else if (header.getSeqNum() < seqNum) {
+                            logger.warn(String.format("[%s:%d] Received data from producer %s:%d with the seqNum as %d. Expecting %d. Sending ACK.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getSeqNum(), seqNum));
+                            hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                         } else {
-                            logger.warn(String.format("[%s:%d] Received empty data from producer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                        }
+                            logger.warn(String.format("[%s:%d] Received data from producer %s:%d with the seqNum as %d. Expecting %d. Ignoring the data.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getSeqNum(), seqNum));
+                         }
                     } else if (header.getType() == BrokerConstants.TYPE.REQ.getValue()) {
                         logger.info(String.format("[%s:%d] Received REQ request from producer %s:%d again. Sending ACK as ACK might have lost before.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
                         hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
