@@ -74,9 +74,19 @@ public class LBHandler {
                             CacheManager.addTopic(topic.getName());
 
                             for (Partition partition : topic.getPartitions()) {
-                                File file = new File();
+                                File file = new File(partition.getTopicName(), partition.getNumber());
                                 if (file.initialize(String.format(BrokerConstants.TOPIC_LOCATION, connection.getSourceIPAddress(), connection.getSourcePort()), partition.getTopicName(), partition.getNumber())) {
                                     CacheManager.addPartition(partition.getTopicName(), partition.getNumber(), file);
+
+                                    //Adding followers if the current broker is leader
+                                    if (isLeader(partition.getLeader())) {
+                                        for (Host follower : partition.getBrokers()) {
+                                            if (!follower.isLeader()) {
+                                                CacheManager.addFollower(file.getName(), follower);
+                                            }
+                                        }
+                                    }
+
                                     logger.info(String.format("[%s:%d] Added topic %s - partition %d information to the local cache.", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
                                     System.out.printf("Handling topic %s - partition %d.\n", partition.getTopicName(), partition.getNumber());
                                 } else {
@@ -131,5 +141,12 @@ public class LBHandler {
         }
 
         return isSuccess;
+    }
+
+    /**
+     * Checks if the current broker is leader
+     */
+    private boolean isLeader(Host leader) {
+        return leader.getAddress().equals(connection.getSourceIPAddress()) && leader.getPort() == connection.getSourcePort();
     }
 }

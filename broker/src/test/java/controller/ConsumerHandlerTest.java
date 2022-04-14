@@ -27,7 +27,7 @@ public class ConsumerHandlerTest {
     @Test
     public void getSegmentNumber_exactOffset_returnSegment() {
         TopicReadWriteRequest request = new TopicReadWriteRequest("topic", 1, 0, 15);
-        File partition = new File();
+        File partition = new File("topic", 1);
 
         setup(partition);
 
@@ -53,7 +53,7 @@ public class ConsumerHandlerTest {
     @Test
     public void getSegmentNumber_inRangeOffset_returnSegment() {
         TopicReadWriteRequest request = new TopicReadWriteRequest("topic", 1, 0, 37);
-        File partition = new File();
+        File partition = new File("topic", 1);
 
         setup(partition);
 

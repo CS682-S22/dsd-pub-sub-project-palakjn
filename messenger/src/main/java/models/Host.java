@@ -13,9 +13,9 @@ public class Host extends Object {
     @Expose
     private int priorityNum;
     @Expose
-    private String address;
+    protected String address;
     @Expose
-    private int port;
+    protected int port;
     @Expose
     private int designation; // 0 for leader and 1 for follower
     private int numberOfPartitions; // Number of partitions a corresponding broker holding. [Will be 0 for other type of hosts: producer/consumer/load balancer]

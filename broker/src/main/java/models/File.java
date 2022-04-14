@@ -18,6 +18,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 public class File {
     private static final Logger logger = LogManager.getLogger(File.class);
+    private String name;
     private List<Segment> segments;
     private FileManager fileManager;
     private String parentLocation;
@@ -29,7 +30,8 @@ public class File {
     private volatile boolean isFlushed;
     private ReentrantReadWriteLock lock;
 
-    public File() {
+    public File(String topicName, int partition) {
+        name = String.format("%s:%d", topicName, partition);
         segments = new ArrayList<>();
         fileManager = new FileManager();
         lock = new ReentrantReadWriteLock();
@@ -43,6 +45,13 @@ public class File {
         segment = new Segment(this.parentLocation, 0, 0);
 
         return fileManager.createDirectory(parentLocation, String.format("%s/%d", topic, partition));
+    }
+
+    /**
+     * Get the name of the file aka partition
+     */
+    public String getName() {
+        return name;
     }
 
     /**

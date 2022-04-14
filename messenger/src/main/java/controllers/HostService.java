@@ -3,8 +3,10 @@ package controllers;
 import configuration.Constants;
 import models.Header;
 import org.apache.logging.log4j.Logger;
-import utilities.NodeTimer;
 import utilities.PacketHandler;
+
+import java.io.IOException;
+import java.net.Socket;
 
 /**
  * Responsible for handling common services which a host needs like sending ACK, NACK, etc.
@@ -16,6 +18,27 @@ public class HostService {
 
     public HostService(Logger logger) {
         this.logger = logger;
+    }
+
+    /**
+     * Open connection with the host
+     */
+    public Connection connect(String address, int port) {
+        Connection connection = null;
+
+        try {
+            Socket socket = new Socket(address, port);
+            logger.info(String.format("[%s:%d] Successfully connected to the broker.", address, port));
+
+            connection = new Connection(socket, address, port);
+            if (!connection.openConnection()) {
+                connection = null;
+            }
+        } catch (IOException exception) {
+            logger.error(String.format("[%s:%d] Fail to make connection with the host.", address, port), exception.getMessage());
+        }
+
+        return connection;
     }
 
     /**
@@ -47,39 +70,42 @@ public class HostService {
      */
     public boolean sendPacketWithACK(Connection connection, byte[] packet, String packetName) {
         boolean isSuccess = false;
-        NodeTimer timer = new NodeTimer();
         boolean running = true;
 
         connection.send(packet);
-        timer.startTimer(packetName, Constants.RTT);
+        connection.setTimer(Constants.ACK_WAIT_TIME);
 
-        while (running) {
-            if (timer.isTimeout()) {
+        while (running && connection.isOpen()) {
+            byte[] responseBytes = connection.receive();
+
+            if (responseBytes != null) {
+                Header.Content header = PacketHandler.getHeader(responseBytes);
+
+                if (header != null) {
+                    if (header.getType() == Constants.TYPE.ACK.getValue()) {
+                        logger.info(String.format("[%s:%d] Received an acknowledgment for the %s request from the host.", connection.getDestinationIPAddress(), connection.getDestinationPort(), packetName));
+                        running = false;
+                        isSuccess = true;
+                    } else if (header.getType() == Constants.TYPE.NACK.getValue()) {
+                        logger.warn(String.format("[%s:%d] Received negative acknowledgment for the %s request from the host. Not retrying.", connection.getDestinationIPAddress(), connection.getDestinationPort(), packetName));
+                        running = false;
+                    } else {
+                        logger.warn(String.format("[%s:%d] Received wrong packet type i.e. %d for the %s request from the host. Retrying.", connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getType(), packetName));
+                        connection.send(packet);
+                    }
+                } else {
+                    logger.warn(String.format("[%s:%d] Received invalid header for the %s request from the host. Retrying.", connection.getDestinationIPAddress(), connection.getDestinationPort(), packetName));
+                    connection.send(packet);
+                }
+            } else if (connection.isOpen()) {
                 logger.warn(String.format("[%s:%d] Time-out happen for the packet %s to the host. Re-sending the packet.", connection.getDestinationIPAddress(), connection.getDestinationPort(), packetName));
                 connection.send(packet);
-                timer.stopTimer();
-                timer.startTimer(packetName, Constants.RTT);
-            } else if (connection.isAvailable()) {
-                byte[] responseBytes = connection.receive();
-
-                if (responseBytes != null) {
-                    Header.Content header = PacketHandler.getHeader(responseBytes);
-
-                    if (header != null) {
-                        if (header.getType() == Constants.TYPE.ACK.getValue()) {
-                            logger.info(String.format("[%s:%d] Received an acknowledgment for the %s request from the host.", connection.getDestinationIPAddress(), connection.getDestinationPort(), packetName));
-                            timer.stopTimer();
-                            running = false;
-                            isSuccess = true;
-                        } else if (header.getType() == Constants.TYPE.NACK.getValue()) {
-                            logger.warn(String.format("[%s:%d] Received negative acknowledgment for the %s request from the host. Not retrying.", connection.getDestinationIPAddress(), connection.getDestinationPort(), packetName));
-                            timer.stopTimer();
-                            running = false;
-                        }
-                    }
-                }
+            } else {
+                logger.warn(String.format("[%s:%d] Connection is closed by the receiving end. Failed to send %s packet", connection.getDestinationIPAddress(), connection.getDestinationPort(), packetName));
             }
         }
+
+        connection.resetTimer();
 
         return isSuccess;
     }

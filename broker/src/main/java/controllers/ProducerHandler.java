@@ -2,6 +2,7 @@ package controllers;
 
 import configuration.Constants;
 import configurations.BrokerConstants;
+import controllers.replication.Followers;
 import models.File;
 import models.Header;
 import models.requests.Request;
@@ -93,8 +94,13 @@ public class ProducerHandler {
 
                                 //Sending to all the subscribers.
                                 sendToSubscribers(data);
-                                hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
-                                seqNum++;
+
+                                //Sending to all the followers if the current broker is the leader
+                                if (sendToFollowers(partition.getName(), data)) {
+                                    //Sending ACK to producer only once replicate data to the followers
+                                    hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                                    seqNum++;
+                                }
                             } else {
                                 logger.warn(String.format("[%s:%d] Received empty data %d from producer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), seqNum, connection.getDestinationIPAddress(), connection.getDestinationPort()));
                             }
@@ -130,5 +136,20 @@ public class ProducerHandler {
             subscriber.onEvent(data);
             logger.info(String.format("[%s:%d] Send data to the subscriber: %s.", connection.getSourceIPAddress(), connection.getSourcePort(), subscriber.getAddress()));
         }
+    }
+
+    /**
+     * [Blocking call] Sending data to all the followers
+     */
+    private boolean sendToFollowers(String key, byte[] data) {
+        boolean isSuccess = false;
+
+        Followers followers = CacheManager.getFollowers(key);
+
+        if (followers != null) {
+            isSuccess = followers.send(data);
+        }
+
+        return isSuccess;
     }
 }

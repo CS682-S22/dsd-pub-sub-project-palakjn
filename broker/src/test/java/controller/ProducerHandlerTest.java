@@ -33,7 +33,7 @@ public class ProducerHandlerTest {
     public void receive_addData_appendToSegment() {
         Connection connection = addDataToChannel();
 
-        File partition = new File();
+        File partition = new File("topic", 1);
         Segment segment = setUpSegment(partition);
 
         callProducer(connection, partition);
@@ -50,7 +50,7 @@ public class ProducerHandlerTest {
     public void receive_addData_writeCorrectOffset() {
         Connection connection = addDataToChannel();
 
-        File partition = new File();
+        File partition = new File("topic", 1);
         Segment segment = setUpSegment(partition);
 
         callProducer(connection, partition);

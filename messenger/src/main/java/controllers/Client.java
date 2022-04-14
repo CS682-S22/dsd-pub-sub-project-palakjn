@@ -150,16 +150,10 @@ public class Client {
     protected boolean connectToBroker(byte[] packet, String packetName) {
         boolean isSuccess = false;
 
-        try {
-            Socket socket = new Socket(broker.getAddress(), broker.getPort());
-            logger.info(String.format("[%s:%d] Successfully connected to the broker.", broker.getAddress(), broker.getPort()));
+        connection = hostService.connect(broker.getAddress(), broker.getPort());
 
-            connection = new Connection(socket, broker.getAddress(), broker.getPort());
-            if (connection.openConnection()) {
-                isSuccess = hostService.sendPacketWithACK(connection, packet, packetName);
-            }
-        } catch (IOException exception) {
-            logger.error(String.format("[%s:%d] Fail to make connection with the broker.", broker.getAddress(), broker.getPort()), exception.getMessage());
+        if (connection != null) {
+            isSuccess = hostService.sendPacketWithACK(connection, packet, packetName);
         }
 
         return isSuccess;
