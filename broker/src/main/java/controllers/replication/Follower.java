@@ -1,7 +1,9 @@
 package controllers.replication;
 
+import configurations.BrokerConstants;
 import controllers.Connection;
 import controllers.HostService;
+import controllers.connections.Channels;
 import models.Host;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -14,7 +16,6 @@ import org.apache.logging.log4j.Logger;
 public class Follower extends Host {
     private static final Logger logger = LogManager.getLogger(Follower.class);
     private HostService hostService;
-    private Connection connection;
 
     public Follower(Host host) {
         address = host.getAddress();
@@ -28,11 +29,14 @@ public class Follower extends Host {
     public boolean send(byte[] data) {
         boolean isSuccess = false;
 
+        Connection connection = Channels.get(getString(), BrokerConstants.CHANNEL_TYPE.DATA);
+
         if (connection == null || !connection.isOpen()) {
             connection = hostService.connect(address, port);
         }
 
         if (connection != null && connection.isOpen()) {
+            Channels.upsert(getString(), connection, BrokerConstants.CHANNEL_TYPE.DATA);
             isSuccess = hostService.sendPacketWithACK(connection, data, "REPLICA DATA");
         }
 
@@ -43,6 +47,9 @@ public class Follower extends Host {
      * CLose the connection with the follower
      */
     public void close() {
+        Connection connection = Channels.get(getString(), BrokerConstants.CHANNEL_TYPE.DATA);
         connection.closeConnection();
+
+        Channels.remove(getString(), BrokerConstants.CHANNEL_TYPE.DATA);
     }
 }

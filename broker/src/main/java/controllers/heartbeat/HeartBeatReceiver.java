@@ -3,6 +3,7 @@ package controllers.heartbeat;
 import configurations.BrokerConstants;
 import configurations.Config;
 import controllers.Connection;
+import controllers.connections.Channels;
 import models.Header;
 import models.HeartBeatRequest;
 import org.apache.logging.log4j.LogManager;
@@ -77,7 +78,8 @@ public class HeartBeatReceiver {
 
                         if (data != null) {
                             HeartBeatRequest heartBeatRequest = JSONDesrializer.fromJson(data, HeartBeatRequest.class);
-
+                            //Adding connection to the channel to be re-use
+                            Channels.add(heartBeatRequest.getServerId(), connection, BrokerConstants.CHANNEL_TYPE.HEARTBEAT);
                             //TODO: failureDetector.heartBeatReceived(heartBeatRequest.getKey(), heartBeatRequest,getServerId());
                         } else {
                             logger.warn(String.format("[%s:%d] Unable to parse body from the received packet from another host %s:%d. ", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));

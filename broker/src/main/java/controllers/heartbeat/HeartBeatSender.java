@@ -1,5 +1,6 @@
 package controllers.heartbeat;
 
+import configurations.BrokerConstants;
 import controllers.Connection;
 import controllers.HostService;
 import controllers.connections.Channels;
@@ -19,13 +20,13 @@ public class HeartBeatSender {
      * Schedule the task to send heartbeat messages at a fixed interval
      */
     public boolean send(HeartBeatRequest request) {
-        Connection connection = Channels.get(request.getKey());
+        Connection connection = Channels.get(request.getReceivedId(), BrokerConstants.CHANNEL_TYPE.HEARTBEAT);
 
-        if (connection == null) {
+        if (connection == null || !connection.isOpen()) {
             connection = connect(request.getReceivedId());
 
             if (connection != null) {
-                Channels.add(request.getReceivedId(), connection);
+                Channels.add(request.getReceivedId(), connection, BrokerConstants.CHANNEL_TYPE.HEARTBEAT);
             } else {
                 return false;
             }

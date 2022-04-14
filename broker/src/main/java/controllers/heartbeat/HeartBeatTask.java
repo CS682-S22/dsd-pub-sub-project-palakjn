@@ -1,6 +1,8 @@
 package controllers.heartbeat;
 
+import configurations.BrokerConstants;
 import controllers.Connection;
+import controllers.connections.Channels;
 import models.HeartBeatRequest;
 import utilities.BrokerPacketHandler;
 
@@ -25,6 +27,7 @@ public class HeartBeatTask implements Runnable {
             connection.send(packet);
         } else {
             HeartBeatSchedular.cancel(request.getKey());
+            Channels.remove(request.getReceivedId(), BrokerConstants.CHANNEL_TYPE.HEARTBEAT);
         }
     }
 }
