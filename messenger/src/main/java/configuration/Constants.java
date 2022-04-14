@@ -19,6 +19,7 @@ public class Constants {
     public static int PRODUCER_WAIT_TIME = 3000;
     public static int GET_BROKER_WAIT_TIME = 2000;
     public static int ACK_WAIT_TIME = 5000;
+    public static int MAX_HEARTBEAT_TASKS =  100;
 
     public enum REQUESTER {
         LOAD_BALANCER(0),
@@ -47,7 +48,8 @@ public class Constants {
         PULL(6),
         SUB(7),  //Subscribe
         FIN(8),
-        UPDATE(9);
+        UPDATE(9),
+        HEARTBEAT(10);
 
         private final int value;
         TYPE(int value) {

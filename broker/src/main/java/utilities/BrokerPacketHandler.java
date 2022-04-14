@@ -1,6 +1,7 @@
 package utilities;
 
 import configurations.BrokerConstants;
+import models.HeartBeatRequest;
 import models.Host;
 import models.requests.Request;
 
@@ -41,5 +42,12 @@ public class BrokerPacketHandler extends PacketHandler {
      */
     public static byte[] createDataPacket(byte[] data) {
          return createDataPacket(BrokerConstants.REQUESTER.BROKER, data);
+    }
+
+    /**
+     * Create the heartbeat packet to send to broker
+     */
+    public static byte[] createHeartBeatPacket(HeartBeatRequest request) {
+        return createPacket(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.HEARTBEAT, request);
     }
 }

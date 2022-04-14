@@ -1,5 +1,5 @@
+import configurations.BrokerConstants;
 import configurations.Config;
-import configuration.Constants;
 import controllers.Connection;
 import controllers.LBHandler;
 import controllers.RequestHandler;
@@ -25,10 +25,11 @@ import java.util.concurrent.Executors;
 public class Broker {
     private static final Logger logger = LogManager.getLogger(Broker.class);
     private ExecutorService threadPool;
-    private boolean running = true;
+    private boolean running;
 
     public Broker() {
-        this.threadPool = Executors.newFixedThreadPool(Constants.NUM_OF_THREADS);
+        threadPool = Executors.newFixedThreadPool(BrokerConstants.NUM_OF_THREADS);
+        running = true;
     }
 
     public static void main(String[] args) {
