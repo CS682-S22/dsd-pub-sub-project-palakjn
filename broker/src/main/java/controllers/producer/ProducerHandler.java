@@ -1,7 +1,11 @@
-package controllers;
+package controllers.producer;
 
 import configuration.Constants;
 import configurations.BrokerConstants;
+import controllers.Connection;
+import controllers.HostService;
+import controllers.consumer.Subscriber;
+import controllers.database.CacheManager;
 import controllers.replication.Followers;
 import models.File;
 import models.Header;

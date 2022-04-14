@@ -1,6 +1,6 @@
 package models;
 
-import controllers.FileManager;
+import controllers.database.FileManager;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;

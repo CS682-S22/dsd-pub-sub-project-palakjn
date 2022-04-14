@@ -1,5 +1,6 @@
-package controllers;
+package controllers.database;
 
+import controllers.consumer.Subscriber;
 import controllers.replication.Followers;
 import models.File;
 import models.Host;

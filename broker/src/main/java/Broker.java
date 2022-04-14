@@ -1,7 +1,7 @@
 import configurations.BrokerConstants;
 import configurations.Config;
 import controllers.Connection;
-import controllers.LBHandler;
+import controllers.loadBalancer.LBHandler;
 import controllers.RequestHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

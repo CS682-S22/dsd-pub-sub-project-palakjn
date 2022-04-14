@@ -2,7 +2,7 @@ package controller;
 
 import configurations.BrokerConstants;
 import controllers.Connection;
-import controllers.ProducerHandler;
+import controllers.producer.ProducerHandler;
 import models.File;
 import models.Segment;
 import org.junit.jupiter.api.Assertions;

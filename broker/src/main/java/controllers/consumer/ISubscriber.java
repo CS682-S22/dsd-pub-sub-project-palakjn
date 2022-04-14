@@ -1,4 +1,4 @@
-package controllers;
+package controllers.consumer;
 
 /**
  * Subscriber which listens for new events.

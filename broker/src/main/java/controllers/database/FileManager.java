@@ -1,4 +1,4 @@
-package controllers;
+package controllers.database;
 
 import java.io.File;
 import java.io.FileOutputStream;

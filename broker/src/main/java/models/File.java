@@ -1,7 +1,7 @@
 package models;
 
 import configurations.BrokerConstants;
-import controllers.FileManager;
+import controllers.database.FileManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 

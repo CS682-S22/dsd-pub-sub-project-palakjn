@@ -1,6 +1,9 @@
-package controllers;
+package controllers.consumer;
 
 import configurations.BrokerConstants;
+import controllers.Connection;
+import controllers.HostService;
+import controllers.database.CacheManager;
 import models.File;
 import models.Header;
 import models.Segment;

@@ -1,6 +1,9 @@
 package controllers;
 
 import configurations.BrokerConstants;
+import controllers.consumer.ConsumerHandler;
+import controllers.loadBalancer.LBHandler;
+import controllers.producer.ProducerHandler;
 import models.Header;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

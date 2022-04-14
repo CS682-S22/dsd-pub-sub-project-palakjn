@@ -1,7 +1,7 @@
 package controller;
 
 import controllers.Connection;
-import controllers.ConsumerHandler;
+import controllers.consumer.ConsumerHandler;
 import models.File;
 import models.Segment;
 import models.requests.TopicReadWriteRequest;
