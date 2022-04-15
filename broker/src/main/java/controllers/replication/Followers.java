@@ -37,7 +37,7 @@ public class Followers {
     public void remove(Host host) {
         lock.writeLock().lock();
 
-        if (followers.size() > 0) {
+        if (followers.size() > 0 && contains(host)) {
             Follower follower = getFollower(host);
             follower.close();
             followers.remove(follower);
@@ -75,5 +75,18 @@ public class Followers {
 
         lock.readLock().unlock();
         return isSuccess;
+    }
+
+    /**
+     * Checks whether the given host exists in the collection
+     */
+    public boolean contains(Host follower) {
+        lock.readLock().lock();
+
+        try {
+            return followers.stream().anyMatch(host -> host.getAddress().equals(follower.getAddress()) && host.getPort() == follower.getPort());
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 }

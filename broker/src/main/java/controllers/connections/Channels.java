@@ -62,4 +62,23 @@ public class Channels {
             dataChannels.remove(key);
         }
     }
+
+    /**
+     * Close and remove all the connections with the given serverId
+     */
+    public synchronized static void remove(String key) {
+        Connection connection = heartBeatChannels.getOrDefault(key, null);
+
+        if (connection != null) {
+            connection.closeConnection();
+            heartBeatChannels.remove(key);
+        }
+
+        connection = dataChannels.getOrDefault(key, null);
+
+        if (connection != null) {
+            connection.closeConnection();
+            dataChannels.remove(key);
+        }
+    }
 }

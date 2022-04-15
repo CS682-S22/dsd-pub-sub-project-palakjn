@@ -146,7 +146,7 @@ public class ProducerHandler {
      * [Blocking call] Sending data to all the followers
      */
     private boolean sendToFollowers(String key, byte[] data) {
-        boolean isSuccess = false;
+        boolean isSuccess = true;
 
         Followers followers = CacheManager.getFollowers(key);
 
