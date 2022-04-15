@@ -33,7 +33,7 @@ public class HeartBeatSender {
         }
 
         Runnable task = new HeartBeatTask(connection, request);
-        HeartBeatSchedular.start(request.getKey(), task);
+        HeartBeatSchedular.start(request.getKey(), task, BrokerConstants.HEARTBEAT_INTERVAL_MS);
 
         return true;
     }

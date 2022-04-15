@@ -22,8 +22,8 @@ public class HeartBeatSchedular {
     /**
      * Schedule the given task to run at the fixed periodic interval
      */
-    public synchronized static void start(String taskName, Runnable task) {
-        ScheduledFuture<?> scheduledTask = executor.scheduleWithFixedDelay(task, BrokerConstants.HEARTBEAT_INTERVAL_MS, BrokerConstants.HEARTBEAT_INTERVAL_MS, TimeUnit.MILLISECONDS);
+    public synchronized static void start(String taskName, Runnable task, long period) {
+        ScheduledFuture<?> scheduledTask = executor.scheduleWithFixedDelay(task, period, period, TimeUnit.MILLISECONDS);
         scheduledTasks.put(taskName, scheduledTask);
     }
 

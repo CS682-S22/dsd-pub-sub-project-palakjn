@@ -12,6 +12,9 @@ public class BrokerConstants extends Constants {
     public static int MAX_SEGMENT_MESSAGES = 500;
     public static long SEGMENT_FLUSH_TIME = 5000; //5 seconds
     public static int HEARTBEAT_INTERVAL_MS = 5000; //5 seconds
+    public static int HEARTBEAT_CHECK_TIME = 10000; //10 seconds
+    public static int HEARTBEAT_MAX_RETRY = 3;
+    public static int HEARTBEAT_TIMEOUT_THRESHOLD = 15000; //15 seconds
 
     public enum CHANNEL_TYPE {
         HEARTBEAT,
