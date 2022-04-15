@@ -17,4 +17,12 @@ public class BrokerConstants extends Constants {
         HEARTBEAT,
         DATA
     }
+
+    public enum BROKER_STATE {
+        ELECTION,
+        SYNC,
+        READY,
+        WAIT_FOR_NEW_FOLLOWER,
+        NONE
+    }
 }

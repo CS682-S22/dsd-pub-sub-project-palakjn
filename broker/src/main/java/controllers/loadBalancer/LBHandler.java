@@ -4,6 +4,7 @@ import configurations.BrokerConstants;
 import controllers.Connection;
 import controllers.HostService;
 import controllers.database.CacheManager;
+import controllers.replication.Broker;
 import models.*;
 import models.requests.Request;
 import org.apache.logging.log4j.LogManager;
@@ -82,12 +83,13 @@ public class LBHandler {
                                     CacheManager.addPartition(partition.getTopicName(), partition.getNumber(), file);
 
                                     //Adding followers if the current broker is leader
-                                    if (isLeader(partition.getLeader())) {
-                                        for (Host follower : partition.getBrokers()) {
-                                            if (!follower.isLeader()) {
-                                                CacheManager.addFollower(file.getName(), follower);
-                                            }
-                                        }
+                                    Host host = new Host(connection.getSourceIPAddress(), connection.getSourcePort());
+                                    if (host.equals(partition.getLeader())) {
+                                        CacheManager.setLeader(file.getName(), new Broker(partition.getLeader()));
+                                    }
+
+                                    for (Host broker : partition.getBrokers()) {
+                                        CacheManager.addBroker(file.getName(), new Broker(broker));
                                     }
 
                                     logger.info(String.format("[%s:%d] Added topic %s - partition %d information to the local cache.", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
@@ -144,12 +146,5 @@ public class LBHandler {
         }
 
         return isSuccess;
-    }
-
-    /**
-     * Checks if the current broker is leader
-     */
-    private boolean isLeader(Host leader) {
-        return leader.getAddress().equals(connection.getSourceIPAddress()) && leader.getPort() == connection.getSourcePort();
     }
 }

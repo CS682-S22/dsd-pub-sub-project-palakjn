@@ -1,7 +1,9 @@
 package controllers.database;
 
+import configurations.BrokerConstants;
 import controllers.consumer.Subscriber;
-import controllers.replication.Followers;
+import controllers.replication.Broker;
+import controllers.replication.Brokers;
 import models.File;
 import models.Host;
 
@@ -17,14 +19,40 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * @author Palak Jain
  */
 public class CacheManager {
+    //Status of the broker for the partition it is holding
+    private static Map<String, BrokerConstants.BROKER_STATE> brokerStatus = new HashMap<>();
+
+    //Partitions information
     private static Map<String, File> partitions = new HashMap<>();
     private static List<String> topics = new ArrayList<>();
+
+    //List of consumers subscribed for the logs
     private static List<Subscriber> subscribers = new ArrayList<>();
-    private static Map<String, Followers> followers = new HashMap<>();
+
+    //Leaders and brokers information which are handling particular topic and partition (Membership table)
+    private static Map<String, Broker> leaders = new HashMap<>();
+    private static Map<String, Brokers> brokers = new HashMap<>();
+
+    //Lock to make data structures thread-safe
     private static ReentrantReadWriteLock subscriberLock = new ReentrantReadWriteLock();
-    private static ReentrantReadWriteLock followerLock = new ReentrantReadWriteLock();
+    private static ReentrantReadWriteLock leadersLock = new ReentrantReadWriteLock();
+    private static ReentrantReadWriteLock brokerLock = new ReentrantReadWriteLock();
 
     private CacheManager() {
+    }
+
+    /**
+     * Get the state mode of the broker which is holding the particular key
+     */
+    public BrokerConstants.BROKER_STATE getStatus(String key) {
+        return brokerStatus.getOrDefault(key, BrokerConstants.BROKER_STATE.NONE);
+    }
+
+    /**
+     * Set the state mode of the broker
+     */
+    public void setStatus(String key, BrokerConstants.BROKER_STATE state) {
+        brokerStatus.put(key, state);
     }
 
     /**
@@ -113,42 +141,115 @@ public class CacheManager {
     }
 
     /**
-     * Add new follower
+     * Set the leader for the given partition key
      */
-    public static void addFollower(String key, Host follower) {
-        followerLock.writeLock().lock();
+    public static void setLeader(String key, Broker leader) {
+        leadersLock.writeLock().lock();
 
-        Followers followerColl = followers.getOrDefault(key, new Followers());
-        followerColl.add(follower);
-        followers.put(key, followerColl);
-
-        followerLock.writeLock().unlock();
-    }
-
-    /**
-     * Remove the follower
-     */
-    public static void removeFollower(String key, Host follower) {
-        followerLock.writeLock().lock();
-
-        if (followers.containsKey(key)) {
-            Followers followerColl = followers.get(key);
-            followerColl.remove(follower);
+        if (leader != null) {
+            leaders.put(key, leader);
         }
 
-        followerLock.writeLock().unlock();
+        leadersLock.writeLock().unlock();
     }
 
     /**
-     * Get all the followers handling the particular key
+     * Set the leader as null for the given partition key
      */
-    public static Followers getFollowers(String key) {
-        followerLock.readLock().lock();
+    public static void setLeaderAsInActive(String key) {
+        leadersLock.writeLock().lock();
+
+        Broker leader = leaders.getOrDefault(key, null);
+        if (leader != null) {
+            leader.setInActive();
+        }
+
+        leadersLock.writeLock().unlock();
+    }
+
+    /**
+     * Get the leader which is holding the given key
+     */
+    public static Broker getLeader(String key) {
+        leadersLock.readLock().lock();
 
         try {
-            return followers.getOrDefault(key, null);
+            return leaders.getOrDefault(key, null);
         } finally {
-            followerLock.readLock().unlock();
+            leadersLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Checks if the given host is the leader of the given partition key
+     */
+    public static boolean isLeader(String key, Host host) {
+        leadersLock.readLock().lock();
+        boolean isEqual = false;
+
+        Broker leader = leaders.getOrDefault(key, null);
+
+        if (leader != null) {
+            isEqual = leader.equals(host);
+        }
+
+        leadersLock.readLock().unlock();
+        return isEqual;
+    }
+
+    /**
+     * Check if the leader holding the partition key is failed.
+     */
+    public static boolean isLeaderFail(String key) {
+        boolean isFailed = true;
+        leadersLock.readLock().lock();
+
+        Broker leader = leaders.getOrDefault(key, null);
+        if (leader != null) {
+            isFailed = !leader.isActive();
+        }
+
+        leadersLock.readLock().unlock();
+        return isFailed;
+    }
+
+    /**
+     * Add new broker
+     */
+    public static void addBroker(String key, Broker broker) {
+        brokerLock.writeLock().lock();
+
+        Brokers brokerColl = brokers.getOrDefault(key, new Brokers());
+        brokerColl.add(broker);
+        brokers.put(key, brokerColl);
+
+        brokerLock.writeLock().unlock();
+    }
+
+    /**
+     * Remove the broker
+     */
+    public static void removeBroker(String key, Broker broker) {
+        brokerLock.writeLock().lock();
+
+        if (brokers.containsKey(key)) {
+            Brokers brokerColl = brokers.get(key);
+            brokerColl.remove(broker);
+        }
+
+        brokerLock.writeLock().unlock();
+    }
+
+    /**
+     * Get all the brokers handling the particular key
+     */
+    public static Brokers getBrokers(String key) {
+        brokerLock.readLock().lock();
+
+        try {
+            return brokers.getOrDefault(key, null);
+        } finally {
+            brokerLock.readLock().unlock();
         }
     }
 }

@@ -149,4 +149,11 @@ public class Host extends Object {
     public boolean isActive() {
         return status.equals(Constants.BROKER_STATUS.ACTIVE);
     }
+
+    /**
+     * Check whether caller and given host is equal
+     */
+    public boolean equals(Host host) {
+        return address.equals(host.getAddress()) && port == host.getPort();
+    }
 }

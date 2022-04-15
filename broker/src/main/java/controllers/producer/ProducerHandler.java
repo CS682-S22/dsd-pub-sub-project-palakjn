@@ -6,9 +6,10 @@ import controllers.Connection;
 import controllers.HostService;
 import controllers.consumer.Subscriber;
 import controllers.database.CacheManager;
-import controllers.replication.Followers;
+import controllers.replication.Brokers;
 import models.File;
 import models.Header;
+import models.Host;
 import models.requests.Request;
 import models.requests.TopicReadWriteRequest;
 import org.apache.logging.log4j.LogManager;
@@ -148,10 +149,12 @@ public class ProducerHandler {
     private boolean sendToFollowers(String key, byte[] data) {
         boolean isSuccess = true;
 
-        Followers followers = CacheManager.getFollowers(key);
+        if (CacheManager.isLeader(key, new Host(connection.getSourceIPAddress(), connection.getSourcePort()))) {
+            Brokers brokers = CacheManager.getBrokers(key);
 
-        if (followers != null) {
-            isSuccess = followers.send(data);
+            if (brokers != null) {
+                isSuccess = brokers.send(data);
+            }
         }
 
         return isSuccess;

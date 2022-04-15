@@ -1,5 +1,6 @@
 package controllers.replication;
 
+import configuration.Constants;
 import configurations.BrokerConstants;
 import controllers.Connection;
 import controllers.HostService;
@@ -13,13 +14,12 @@ import org.apache.logging.log4j.Logger;
  *
  * @author Palak Jain
  */
-public class Follower extends Host {
-    private static final Logger logger = LogManager.getLogger(Follower.class);
+public class Broker extends Host {
+    private static final Logger logger = LogManager.getLogger(Broker.class);
     private HostService hostService;
 
-    public Follower(Host host) {
-        address = host.getAddress();
-        port = host.getPort();
+    public Broker(Host host) {
+        super(host);
         hostService = new HostService(logger);
     }
 
