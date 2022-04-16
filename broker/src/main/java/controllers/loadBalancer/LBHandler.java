@@ -1,5 +1,6 @@
 package controllers.loadBalancer;
 
+import configuration.Constants;
 import configurations.BrokerConstants;
 import controllers.Connection;
 import controllers.HostService;
@@ -7,10 +8,12 @@ import controllers.database.CacheManager;
 import controllers.replication.Broker;
 import models.*;
 import models.requests.Request;
+import models.responses.Response;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import utilities.BrokerPacketHandler;
 import utilities.JSONDesrializer;
+import utilities.PacketHandler;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -75,29 +78,7 @@ public class LBHandler {
                             logger.warn(String.format("[%s:%d] Broker already handling the topic %s. Will send NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
                             hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                         } else if (topic.getNumOfPartitions() > 0) {
-                            CacheManager.addTopic(topic.getName());
-
-                            for (Partition partition : topic.getPartitions()) {
-                                File file = new File(partition.getTopicName(), partition.getNumber());
-                                if (file.initialize(String.format(BrokerConstants.TOPIC_LOCATION, connection.getSourceIPAddress(), connection.getSourcePort()), partition.getTopicName(), partition.getNumber())) {
-                                    CacheManager.addPartition(partition.getTopicName(), partition.getNumber(), file);
-
-                                    //Adding followers if the current broker is leader
-                                    Host host = new Host(connection.getSourceIPAddress(), connection.getSourcePort());
-                                    if (host.equals(partition.getLeader())) {
-                                        CacheManager.setLeader(file.getName(), new Broker(partition.getLeader()));
-                                    }
-
-                                    for (Host broker : partition.getBrokers()) {
-                                        CacheManager.addBroker(file.getName(), new Broker(broker));
-                                    }
-
-                                    logger.info(String.format("[%s:%d] Added topic %s - partition %d information to the local cache.", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
-                                    System.out.printf("Handling topic %s - partition %d.\n", partition.getTopicName(), partition.getNumber());
-                                } else {
-                                    logger.warn(String.format("[%s:%d] Fail to create directory for the topic- %s - Partition %d", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
-                                }
-                            }
+                            addTopic(topic);
 
                             hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                             isSuccess = true;
@@ -123,6 +104,35 @@ public class LBHandler {
     }
 
     /**
+     * Add the topic information to local DB
+     */
+    private void addTopic(Topic topic) {
+        CacheManager.addTopic(topic.getName());
+
+        for (Partition partition : topic.getPartitions()) {
+            File file = new File(partition.getTopicName(), partition.getNumber());
+            if (file.initialize(String.format(BrokerConstants.TOPIC_LOCATION, connection.getSourceIPAddress(), connection.getSourcePort()), partition.getTopicName(), partition.getNumber())) {
+                CacheManager.addPartition(partition.getTopicName(), partition.getNumber(), file);
+
+                //Adding followers if the current broker is leader
+                Host host = new Host(connection.getSourceIPAddress(), connection.getSourcePort());
+                if (host.equals(partition.getLeader())) {
+                    CacheManager.setLeader(file.getName(), new Broker(partition.getLeader()));
+                }
+
+                for (Host broker : partition.getBrokers()) {
+                    CacheManager.addBroker(file.getName(), new Broker(broker));
+                }
+
+                logger.info(String.format("[%s:%d] Added topic %s - partition %d information to the local cache.", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
+                System.out.printf("Handling topic %s - partition %d.\n", partition.getTopicName(), partition.getNumber());
+            } else {
+                logger.warn(String.format("[%s:%d] Fail to create directory for the topic- %s - Partition %d", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
+            }
+        }
+    }
+
+    /**
      * Send the request to add/remove to the load balancer
      */
     private boolean send(Host brokerInfo, Host loadBalancerInfo, String type) {
@@ -135,7 +145,7 @@ public class LBHandler {
             Connection connection = new Connection(socket, loadBalancerInfo.getAddress(), loadBalancerInfo.getPort(), brokerInfo.getAddress(), brokerInfo.getPort());
             if (connection.openConnection()) {
                 byte[] packet = BrokerPacketHandler.createPacket(brokerInfo, type);
-                isSuccess = hostService.sendPacketWithACK(connection, packet, String.format("%s:%s", BrokerConstants.REQUESTER.BROKER.name(), type));
+                isSuccess = send(connection, packet, String.format("%s:%s", BrokerConstants.REQUESTER.BROKER.name(), type));
                 if (isSuccess) {
                     logger.info("Successfully joined to the network");
                     System.out.println("Successfully joined to the network");
@@ -146,5 +156,75 @@ public class LBHandler {
         }
 
         return isSuccess;
+    }
+
+    /**
+     * Send the packet to the host and waits for an acknowledgement. Re-send the packet if time-out
+     */
+    public boolean send(Connection connection, byte[] packet, String type) {
+        boolean isSuccess = false;
+        boolean running = true;
+
+        connection.send(packet);
+        connection.setTimer(Constants.ACK_WAIT_TIME);
+
+        while (running && connection.isOpen()) {
+            byte[] responseBytes = connection.receive();
+
+            if (responseBytes != null) {
+                Header.Content header = BrokerPacketHandler.getHeader(responseBytes);
+
+                if (header != null) {
+                    if (header.getType() == Constants.TYPE.ACK.getValue() && type.equalsIgnoreCase(BrokerConstants.REQUEST_TYPE.REM)) {
+                        logger.info(String.format("[%s:%d] Received an acknowledgment for the %s request from the host %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                        running = false;
+                        isSuccess = true;
+                    } else if (header.getType() == Constants.TYPE.NACK.getValue() && type.equalsIgnoreCase(BrokerConstants.REQUEST_TYPE.REM)) {
+                        logger.warn(String.format("[%s:%d] Received negative acknowledgment for the %s request from the host %s:%d. Not retrying.", connection.getSourceIPAddress(), connection.getSourcePort(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                        running = false;
+                    } else if (header.getType() == Constants.TYPE.RESP.getValue() && type.equalsIgnoreCase(Constants.REQUEST_TYPE.ADD)) {
+                        logger.info(String.format("[%s:%d] Received a response for the %s request from the host %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+
+                        running = !getPriorityNum(responseBytes);
+                    } else {
+                        logger.warn(String.format("[%s:%d] Received wrong packet type i.e. %d for the %s request from the host %s:%d. Retrying.", connection.getSourceIPAddress(), connection.getSourcePort(), header.getType(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                        connection.send(packet);
+                    }
+                } else {
+                    logger.warn(String.format("[%s:%d] Received invalid header for the %s request from the host %s:%d. Retrying.", connection.getSourceIPAddress(), connection.getSourcePort(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                    connection.send(packet);
+                }
+            } else if (connection.isOpen()) {
+                logger.warn(String.format("[%s:%d] Time-out happen for the packet %s to the host %s:%d. Re-sending the packet.", connection.getSourceIPAddress(), connection.getSourcePort(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                connection.send(packet);
+            } else {
+                logger.warn(String.format("[%s:%d] Connection is closed by the receiving end %s:%d. Failed to send %s packet", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort(), type));
+            }
+        }
+
+        connection.resetTimer();
+
+        return isSuccess;
+    }
+
+    /**
+     * Get the priorityNumber from the response
+     */
+    private boolean getPriorityNum(byte[] responseBytes) {
+        boolean isSet = false;
+
+        byte[] body = BrokerPacketHandler.getData(responseBytes);
+
+        if (body != null) {
+            Response<JoinResponse> joinResponse = JSONDesrializer.fromJson(body, Response.class);
+
+            if (joinResponse != null && joinResponse.isValid() && joinResponse.isOk()) {
+                CacheManager.setPriorityNum(joinResponse.getObject().getPriorityNum());
+                logger.info(String.format("Broker %s:%d priority number is %d.", connection.getSourceIPAddress(), connection.getSourcePort(), CacheManager.getPriorityNum()));
+                isSet = true;
+            }
+        }
+
+        return isSet;
     }
 }

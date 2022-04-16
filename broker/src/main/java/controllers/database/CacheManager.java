@@ -19,6 +19,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * @author Palak Jain
  */
 public class CacheManager {
+    //Priority number of the broker
+    private volatile static int priorityNum;
+
     //Status of the broker for the partition it is holding
     private static Map<String, BrokerConstants.BROKER_STATE> brokerStatus = new HashMap<>();
 
@@ -39,6 +42,20 @@ public class CacheManager {
     private static ReentrantReadWriteLock brokerLock = new ReentrantReadWriteLock();
 
     private CacheManager() {
+    }
+
+    /**
+     * Get the priority number assigned to the broker
+     */
+    public static int getPriorityNum() {
+        return priorityNum;
+    }
+
+    /**
+     * Set the priority number
+     */
+    public static void setPriorityNum(int priorityNum) {
+        CacheManager.priorityNum = priorityNum;
     }
 
     /**

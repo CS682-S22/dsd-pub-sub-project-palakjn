@@ -2,6 +2,7 @@ package controllers;
 
 import configurations.BrokerConstants;
 import controllers.consumer.ConsumerHandler;
+import controllers.heartbeat.HeartBeatReceiver;
 import controllers.loadBalancer.LBHandler;
 import controllers.producer.ProducerHandler;
 import models.Header;
@@ -48,15 +49,20 @@ public class RequestHandler {
                         hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                     }
                 } else if (header.getRequester() == BrokerConstants.REQUESTER.PRODUCER.getValue()) {
-                    logger.info("Received request from framework.Producer.");
+                    logger.info("Received request from Producer.");
                     ProducerHandler producerHandler = new ProducerHandler(connection);
                     producerHandler.processRequest(header, request);
                     running = false;
                 } else if (header.getRequester() == BrokerConstants.REQUESTER.CONSUMER.getValue()) {
-                    logger.info("Received request from framework.Consumer.");
+                    logger.info("Received request from Consumer.");
                     ConsumerHandler consumerHandler = new ConsumerHandler(connection);
                     consumerHandler.processRequest(header, request);
                     running = false;
+                } else if (header.getRequester() == BrokerConstants.REQUESTER.BROKER.getValue()) {
+                    if (header.getType() == BrokerConstants.TYPE.HEARTBEAT.getValue()) {
+                        HeartBeatReceiver heartBeatReceiver = new HeartBeatReceiver();
+                        heartBeatReceiver.handleRequest(connection, request);
+                    }
                 }
             } else {
                 running = false;

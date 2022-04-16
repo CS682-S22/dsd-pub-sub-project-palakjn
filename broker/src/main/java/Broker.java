@@ -44,8 +44,15 @@ public class Broker {
                 //Joining to the network
                 LBHandler lbHandler = new LBHandler();
                 if (lbHandler.join(config.getLocal(), config.getLoadBalancer())) {
-                    //Listening for the new connections
-                    broker.listen(config);
+                    //Listening for the DATA/SYNC connections
+                    logger.info(String.format("[%s] Listening on DATA/SYNC port %d.", config.getLocal().getAddress(), config.getLocal().getPort()));
+                    System.out.printf("[%s] Listening on DATA/SYNC port %d.\n", config.getLocal().getAddress(), config.getLocal().getPort());
+                    broker.listen(config.getLocal().getAddress(), config.getLocal().getPort());
+
+                    //Listening for the HEARTBEAT/ELECTION connections
+                    logger.info(String.format("[%s] Listening on HEARTBEAT/ELECTION port %d.", config.getHeartBeatServer().getAddress(), config.getHeartBeatServer().getPort()));
+                    System.out.printf("[%s] Listening on HEARTBEAT/ELECTION port %d.\n", config.getHeartBeatServer().getAddress(), config.getHeartBeatServer().getPort());
+                    broker.listen(config.getHeartBeatServer().getAddress(), config.getHeartBeatServer().getPort());
                 }
             }
         }
@@ -102,31 +109,29 @@ public class Broker {
     }
 
     /**
-     * Listen for new connection
+     * Listen for DATA/SYNC connection
      */
-    private void listen(Config config) {
+    private void listen(String address, int port) {
         ServerSocket serverSocket;
 
         try {
-            serverSocket = new ServerSocket(config.getLocal().getPort());
+            serverSocket = new ServerSocket(port);
         } catch (IOException exception) {
-            logger.error(String.format("Fail to start the broker at the node %s: %d.", config.getLocal().getAddress(), config.getLocal().getPort()), exception);
+            logger.error(String.format("Fail to start the broker at the node %s: %d.", address, port), exception);
             return;
         }
-        logger.info(String.format("[%s] Listening on port %d.", config.getLocal().getAddress(), config.getLocal().getPort()));
-        System.out.printf("[%s] Listening on port %d.\n", config.getLocal().getAddress(), config.getLocal().getPort());
 
         while (running) {
             try {
                 Socket socket = serverSocket.accept();
                 logger.info(String.format("[%s:%d] Received the connection from the host.", socket.getInetAddress().getHostAddress(), socket.getPort()));
-                Connection connection = new Connection(socket, socket.getInetAddress().getHostAddress(), socket.getPort(), config.getLocal().getAddress(), config.getLocal().getPort());
+                Connection connection = new Connection(socket, socket.getInetAddress().getHostAddress(), socket.getPort(), address, port);
                 if (connection.openConnection()) {
                     RequestHandler requestHandler = new RequestHandler(connection);
                     threadPool.execute(requestHandler::process);
                 }
             } catch (IOException exception) {
-                logger.error(String.format("[%s:%d] Fail to accept the connection from another host. ", config.getLocal().getAddress(), config.getLocal().getPort()), exception);
+                logger.error(String.format("[%s:%d] Fail to accept the connection from another host. ", address, port), exception);
             }
         }
     }
