@@ -199,7 +199,7 @@ public class RequestHandler {
                 if (request.getType().equalsIgnoreCase(Constants.REQUEST_TYPE.ADD)) {
                     createTopic(topicRequest);
                 } else {
-                    logger.warn(String.format("[%s:%d] Received unsupported action %d for the topic related service. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getType()));
+                    logger.warn(String.format("[%s:%d] Received unsupported action %s for the topic related service. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getType()));
                     hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
                 }
             } else {
@@ -277,7 +277,7 @@ public class RequestHandler {
                 logger.debug(String.format("[%s:%d] Sending the the topic %s - Partitions {%s} information to the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getPartitionString()));
                 Request<Topic> request = new Request<>(Constants.REQUEST_TYPE.ADD, topic);
                 byte[] packet = LBPacketHandler.createPacket(Constants.TYPE.REQ, request);
-                boolean isSuccess = hostService.sendPacketWithACK(connection, packet, String.format("%s:%s", Constants.REQUESTER.LOAD_BALANCER.name(), Constants.TYPE.REQ.name()));
+                boolean isSuccess = hostService.sendPacketWithACK(connection, packet, Constants.ACK_WAIT_TIME);
                 if (isSuccess) {
                     logger.info(String.format("[%s:%d] Send the topic %s - Partitions {%s} information to the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getPartitionString()));
                 } else {

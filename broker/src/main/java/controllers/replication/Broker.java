@@ -1,6 +1,5 @@
 package controllers.replication;
 
-import configuration.Constants;
 import configurations.BrokerConstants;
 import controllers.Connection;
 import controllers.HostService;
@@ -26,18 +25,18 @@ public class Broker extends Host {
     /**
      * Send replica data to the follower
      */
-    public boolean send(byte[] data) {
+    public boolean send(byte[] data, BrokerConstants.CHANNEL_TYPE channel_type, int waitTime, boolean retry) {
         boolean isSuccess = false;
 
-        Connection connection = Channels.get(getString(), BrokerConstants.CHANNEL_TYPE.DATA);
+        Connection connection = Channels.get(getString(), channel_type);
 
         if (connection == null || !connection.isOpen()) {
             connection = hostService.connect(address, port);
         }
 
         if (connection != null && connection.isOpen()) {
-            Channels.upsert(getString(), connection, BrokerConstants.CHANNEL_TYPE.DATA);
-            isSuccess = hostService.sendPacketWithACK(connection, data, "REPLICA DATA");
+            Channels.upsert(getString(), connection, channel_type);
+            isSuccess = hostService.sendPacketWithACK(connection, data, waitTime, retry);
         }
 
         return isSuccess;

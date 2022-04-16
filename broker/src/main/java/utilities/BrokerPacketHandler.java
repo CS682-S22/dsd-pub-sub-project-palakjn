@@ -1,8 +1,11 @@
 package utilities;
 
+import configuration.Constants;
 import configurations.BrokerConstants;
+import models.ElectionRequest;
 import models.HeartBeatRequest;
 import models.Host;
+import models.requests.BrokerUpdateRequest;
 import models.requests.Request;
 
 import java.nio.ByteBuffer;
@@ -49,5 +52,25 @@ public class BrokerPacketHandler extends PacketHandler {
      */
     public static byte[] createHeartBeatPacket(HeartBeatRequest request) {
         return createPacket(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.HEARTBEAT, request);
+    }
+
+    /**
+     * Create the election packet to send to high priority brokers
+     */
+    public static byte[] createElectionPacket(String key) {
+        ElectionRequest electionRequest = new ElectionRequest(key);
+        Request<ElectionRequest> request = new Request<>(BrokerConstants.REQUEST_TYPE.ELECTION, electionRequest);
+
+        return createPacket(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.ELECTION, request);
+    }
+
+    /**
+     * Create the packet to indicate other hosts about the new leader
+     */
+    public static byte[] createLeaderUpdateRequest(String key, Host newLeader) {
+        BrokerUpdateRequest brokerUpdateRequest = new BrokerUpdateRequest(key, newLeader);
+        Request<BrokerUpdateRequest> request = new Request<>(BrokerConstants.REQUEST_TYPE.LEADER, brokerUpdateRequest);
+
+        return createPacket(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.UPDATE, request);
     }
 }

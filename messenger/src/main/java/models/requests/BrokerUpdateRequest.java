@@ -23,6 +23,13 @@ public class BrokerUpdateRequest {
         this.broker = broker;
     }
 
+    public BrokerUpdateRequest(String key, Host broker) {
+        String[] parts = key.split(":");
+        this.topic = parts[0];
+        this.partition = Integer.parseInt(parts[1]);
+        this.broker = broker;
+    }
+
     /**
      * Get the topic name which failed broker was handling
      */

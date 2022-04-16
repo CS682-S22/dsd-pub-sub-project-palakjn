@@ -66,7 +66,7 @@ public class Consumer extends Client {
 
         //Get the broker and connect to the broker
         if ((broker != null ||
-                getBroker(lbPacket, topic, key)) && connectToBroker(brokerRequest, method.name())) {
+                getBroker(lbPacket, topic, key)) && connectToBroker(brokerRequest)) {
             this.topic = topic;
             this.key = key;
             isConnected = true;
@@ -149,7 +149,7 @@ public class Consumer extends Client {
      */
     private void sendPULLRequest() {
         byte[] request = PacketHandler.createToBrokerRequest(Constants.REQUESTER.CONSUMER, Constants.TYPE.PULL, topic, key, offset, Constants.CONSUMER_MAX_PULL_SIZE);
-        if (connectToBroker(request, Constants.TYPE.PULL.name())) {
+        if (connectToBroker(request)) {
             timer.startTimer("CONSUMER PULL TIMER", Constants.CONSUMER_WAIT_TIME);
             isConnected = true;
         } else {

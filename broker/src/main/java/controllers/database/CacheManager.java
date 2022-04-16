@@ -19,8 +19,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * @author Palak Jain
  */
 public class CacheManager {
-    //Priority number of the broker
-    private volatile static int priorityNum;
+    //Details of local broker
+    private static Host broker;
 
     //Status of the broker for the partition it is holding
     private static Map<String, BrokerConstants.BROKER_STATE> brokerStatus = new HashMap<>();
@@ -45,30 +45,44 @@ public class CacheManager {
     }
 
     /**
-     * Get the priority number assigned to the broker
+     * Get the current running broker info
      */
-    public static int getPriorityNum() {
-        return priorityNum;
+    public static Host getBrokerInfo() {
+        return broker;
     }
 
     /**
-     * Set the priority number
+     * Set the current running broker details
+     */
+    public static void setBroker(Host host) {
+        broker = host;
+    }
+
+    /**
+     * Set the priority number of the current running broker
      */
     public static void setPriorityNum(int priorityNum) {
-        CacheManager.priorityNum = priorityNum;
+        broker.setPriorityNum(priorityNum);
+    }
+
+    /**
+     * Get the priority number of the current running broker
+     */
+    public static int getPriorityNum() {
+        return broker.getPriorityNum();
     }
 
     /**
      * Get the state mode of the broker which is holding the particular key
      */
-    public BrokerConstants.BROKER_STATE getStatus(String key) {
+    public static BrokerConstants.BROKER_STATE getStatus(String key) {
         return brokerStatus.getOrDefault(key, BrokerConstants.BROKER_STATE.NONE);
     }
 
     /**
      * Set the state mode of the broker
      */
-    public void setStatus(String key, BrokerConstants.BROKER_STATE state) {
+    public static void setStatus(String key, BrokerConstants.BROKER_STATE state) {
         brokerStatus.put(key, state);
     }
 
@@ -268,5 +282,22 @@ public class CacheManager {
         } finally {
             brokerLock.readLock().unlock();
         }
+    }
+
+    /**
+     * Get the list of brokers which has high priority number than current broker priority number
+     */
+    public static List<Broker> getBrokers(String key, BrokerConstants.PRIORITY_CHOICE priority_choice) {
+        List<Broker> brokers = null;
+        brokerLock.readLock().lock();
+
+        Brokers collection = getBrokers(key);
+
+        if (collection != null) {
+            brokers = collection.getBrokers(getPriorityNum(), priority_choice);
+        }
+
+        brokerLock.readLock().unlock();
+        return brokers;
     }
 }

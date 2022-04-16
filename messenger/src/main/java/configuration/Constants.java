@@ -10,7 +10,6 @@ import java.util.List;
 public class Constants {
     public static final int START_VALID_PORT = 1700;
     public static final int END_VALID_PORT = 1724;
-    public static int RTT = 30000; //Response Turnout time. The time (in milliseconds) host will be waiting for response.
     public static int NUM_OF_THREADS = 50;
     public static int THREAD_COUNT = 1;
     public static int QUEUE_BUFFER_SIZE = 1000;
@@ -18,7 +17,7 @@ public class Constants {
     public static int CONSUMER_MAX_PULL_SIZE = 500;
     public static int PRODUCER_WAIT_TIME = 3000;
     public static int GET_BROKER_WAIT_TIME = 2000;
-    public static int ACK_WAIT_TIME = 5000;
+    public static int ACK_WAIT_TIME = 10000;
     public static int MAX_HEARTBEAT_TASKS =  100;
 
     public enum REQUESTER {
@@ -49,7 +48,8 @@ public class Constants {
         SUB(7),  //Subscribe
         FIN(8),
         UPDATE(9),
-        HEARTBEAT(10);
+        HEARTBEAT(10),
+        ELECTION(11);
 
         private final int value;
         TYPE(int value) {
@@ -148,6 +148,7 @@ public class Constants {
         public static String REM = "REMOVE";
         public static String FAIL = "FAIL";
         public static String LEADER = "NEW LEADER";
+        public static String ELECTION = "ELECTION";
     }
 
     public enum BROKER_DESIGNATION {

@@ -76,7 +76,7 @@ public class Processor {
                     byte[] packet = AppPacketHandler.createAddTopicPacket(createTopicRequest, seqNum);
 
                     connection.send(packet);
-                    timer.startTimer("TOPIC", AppConstants.RTT);
+                    timer.startTimer("TOPIC", AppConstants.ACK_WAIT_TIME);
                     boolean reading = true;
 
                     while (reading) {
@@ -84,7 +84,7 @@ public class Processor {
                             logger.warn(String.format("[%s:%d] Timeout happen for the packet having topic %s - partition count %d information. Sending again", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort(), createTopicRequest.getName(), createTopicRequest.getNumOfPartitions()));
                             connection.send(packet);
                             timer.stopTimer();
-                            timer.startTimer("TOPIC", AppConstants.RTT);
+                            timer.startTimer("TOPIC", AppConstants.ACK_WAIT_TIME);
                         } else if (connection.isAvailable()) {
                             byte[] responseInBytes = connection.receive();
 

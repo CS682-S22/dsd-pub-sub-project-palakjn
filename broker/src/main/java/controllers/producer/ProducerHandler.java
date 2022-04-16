@@ -153,7 +153,7 @@ public class ProducerHandler {
             Brokers brokers = CacheManager.getBrokers(key);
 
             if (brokers != null) {
-                isSuccess = brokers.send(data);
+                isSuccess = brokers.send(data, BrokerConstants.CHANNEL_TYPE.DATA, BrokerConstants.ACK_WAIT_TIME, true);
             }
         }
 

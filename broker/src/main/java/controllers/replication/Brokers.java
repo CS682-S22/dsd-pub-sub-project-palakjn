@@ -1,5 +1,6 @@
 package controllers.replication;
 
+import configurations.BrokerConstants;
 import models.Host;
 
 import java.util.ArrayList;
@@ -64,13 +65,13 @@ public class Brokers {
      *
      * @return true if success to send the data to all the other brokers else false if not able to send the data to one or more brokers.
      */
-    public boolean send(byte[] data) {
+    public boolean send(byte[] data, BrokerConstants.CHANNEL_TYPE channel_type, int waitTime, boolean retry) {
         boolean isSuccess = true;
         lock.readLock().lock();
 
         //Sending the data to all the other brokers. Even when one of the broker failed.
         for (Broker broker : brokers) {
-            isSuccess = broker.send(data) && isSuccess;
+            isSuccess = broker.send(data, channel_type, waitTime, retry) && isSuccess;
         }
 
         lock.readLock().unlock();
@@ -88,5 +89,23 @@ public class Brokers {
         } finally {
             lock.readLock().unlock();
         }
+    }
+
+    /**
+     * Get the list of brokers which has high or less priority number (based on given choice) than the given one
+     */
+    public List<Broker> getBrokers(int priorityNum, BrokerConstants.PRIORITY_CHOICE priority_choice) {
+        List<Broker> collection = new ArrayList<>();
+        lock.readLock().lock();
+
+        for (Broker broker : brokers) {
+            if ((priority_choice == BrokerConstants.PRIORITY_CHOICE.HIGH && broker.getPriorityNum() > priorityNum) ||
+                    (priority_choice == BrokerConstants.PRIORITY_CHOICE.LESS && broker.getPriorityNum() < priorityNum)) {
+                collection.add(broker);
+            }
+        }
+
+        lock.readLock().unlock();
+        return collection;
     }
 }

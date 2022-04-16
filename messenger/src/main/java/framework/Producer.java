@@ -109,6 +109,6 @@ public class Producer extends Client {
         byte[] brokerRequest = PacketHandler.createToBrokerRequest(Constants.REQUESTER.PRODUCER, Constants.TYPE.REQ, topic, key);
 
         return (broker != null ||
-                getBroker(lbPacket, topic, key)) && connectToBroker(brokerRequest, Constants.TYPE.REQ.name());
+                getBroker(lbPacket, topic, key)) && connectToBroker(brokerRequest);
     }
 }

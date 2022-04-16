@@ -76,14 +76,14 @@ public class Client {
                 boolean running = true;
 
                 connection.send(packet);
-                timer.startTimer(Constants.TYPE.REQ.name(), Constants.RTT);
+                timer.startTimer(Constants.TYPE.REQ.name(), Constants.ACK_WAIT_TIME);
 
                 while (running) {
                     if (timer.isTimeout()) {
                         logger.warn(String.format("[%s] [%s:%d] Time-out happen for the REQ packet to the host. Re-sending the packet.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort()));
                         connection.send(packet);
                         timer.stopTimer();
-                        timer.startTimer(Constants.TYPE.REQ.name(), Constants.RTT);
+                        timer.startTimer(Constants.TYPE.REQ.name(), Constants.ACK_WAIT_TIME);
                     } else if (connection.isAvailable()) {
                         byte[] responseBytes = connection.receive();
 
@@ -107,23 +107,23 @@ public class Client {
                                                 logger.warn(String.format("[%s] [%s:%d] Received response with status as SYNC from load balancer. Sleeping for %d amount of time and retrying.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort(), Constants.GET_BROKER_WAIT_TIME));
                                                 Thread.sleep(Constants.GET_BROKER_WAIT_TIME);
                                                 connection.send(packet);
-                                                timer.startTimer(Constants.TYPE.REQ.name(), Constants.RTT);
+                                                timer.startTimer(Constants.TYPE.REQ.name(), Constants.ACK_WAIT_TIME);
                                             } else if (response.isOk()) {
                                                 broker = response.getObject();
                                             } else {
                                                 logger.warn(String.format("[%s] [%s:%d] Received response with invalid status %s from the load balancer. Retrying.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort(), response.getStatus()));
                                                 connection.send(packet);
-                                                timer.startTimer(Constants.TYPE.REQ.name(), Constants.RTT);
+                                                timer.startTimer(Constants.TYPE.REQ.name(), Constants.ACK_WAIT_TIME);
                                             }
                                         } else {
                                             logger.warn(String.format("[%s] [%s:%d] Received invalid response from the load balancer. Retrying.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort()));
                                             connection.send(packet);
-                                            timer.startTimer(Constants.TYPE.REQ.name(), Constants.RTT);
+                                            timer.startTimer(Constants.TYPE.REQ.name(), Constants.ACK_WAIT_TIME);
                                         }
                                     } else {
                                         logger.warn(String.format("[%s] [%s:%d] Received empty body from the load balancer. Retrying.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort()));
                                         connection.send(packet);
-                                        timer.startTimer(Constants.TYPE.REQ.name(), Constants.RTT);
+                                        timer.startTimer(Constants.TYPE.REQ.name(), Constants.ACK_WAIT_TIME);
                                     }
                                 } else if (header.getType() == Constants.TYPE.NACK.getValue()) {
                                     logger.warn(String.format("[%s] [%s:%d] Received negative acknowledgment for the REQ request from the host. Not retrying.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort()));
@@ -147,13 +147,13 @@ public class Client {
     /**
      * Send initial connection establishment request to the broker
      */
-    protected boolean connectToBroker(byte[] packet, String packetName) {
+    protected boolean connectToBroker(byte[] packet) {
         boolean isSuccess = false;
 
         connection = hostService.connect(broker.getAddress(), broker.getPort());
 
         if (connection != null) {
-            isSuccess = hostService.sendPacketWithACK(connection, packet, packetName);
+            isSuccess = hostService.sendPacketWithACK(connection, packet, Constants.ACK_WAIT_TIME);
         }
 
         return isSuccess;

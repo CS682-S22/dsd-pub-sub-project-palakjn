@@ -1,8 +1,10 @@
 import configurations.BrokerConstants;
 import configurations.Config;
 import controllers.Connection;
+import controllers.database.CacheManager;
 import controllers.loadBalancer.LBHandler;
 import controllers.RequestHandler;
+import models.Host;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import utilities.JSONDesrializer;
@@ -44,6 +46,8 @@ public class Broker {
                 //Joining to the network
                 LBHandler lbHandler = new LBHandler();
                 if (lbHandler.join(config.getLocal(), config.getLoadBalancer())) {
+                    CacheManager.setBroker(new Host(config.getLocal().getAddress(), config.getLocal().getPort()));
+
                     //Listening for the DATA/SYNC connections
                     logger.info(String.format("[%s] Listening on DATA/SYNC port %d.", config.getLocal().getAddress(), config.getLocal().getPort()));
                     System.out.printf("[%s] Listening on DATA/SYNC port %d.\n", config.getLocal().getAddress(), config.getLocal().getPort());

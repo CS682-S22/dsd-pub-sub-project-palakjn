@@ -15,6 +15,7 @@ public class BrokerConstants extends Constants {
     public static int HEARTBEAT_CHECK_TIME = 10000; //10 seconds
     public static int HEARTBEAT_MAX_RETRY = 3;
     public static int HEARTBEAT_TIMEOUT_THRESHOLD = 15000; //15 seconds
+    public static int ELECTION_RESPONSE_WAIT_TIME = 30000; //30 seconds
 
     public enum CHANNEL_TYPE {
         HEARTBEAT,
@@ -27,5 +28,10 @@ public class BrokerConstants extends Constants {
         READY,
         WAIT_FOR_NEW_FOLLOWER,
         NONE
+    }
+
+    public enum PRIORITY_CHOICE {
+        HIGH,
+        LESS
     }
 }

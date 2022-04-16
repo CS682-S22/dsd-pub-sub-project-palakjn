@@ -68,12 +68,19 @@ public class HostService {
     /**
      * Send the packet to the host and waits for an acknowledgement. Re-send the packet if time-out
      */
-    public boolean sendPacketWithACK(Connection connection, byte[] packet, String packetName) {
+    public boolean sendPacketWithACK(Connection connection, byte[] packet, int timeout) {
+        return sendPacketWithACK(connection, packet, timeout, true);
+    }
+
+    /**
+     * Send the packet to the host and waits for an acknowledgement. Re-send the packet if time-out only if "retry" param is set to true
+     */
+    public boolean sendPacketWithACK(Connection connection, byte[] packet, int timeout, boolean retry) {
         boolean isSuccess = false;
         boolean running = true;
 
         connection.send(packet);
-        connection.setTimer(Constants.ACK_WAIT_TIME);
+        connection.setTimer(timeout);
 
         while (running && connection.isOpen()) {
             byte[] responseBytes = connection.receive();
@@ -83,26 +90,28 @@ public class HostService {
 
                 if (header != null) {
                     if (header.getType() == Constants.TYPE.ACK.getValue()) {
-                        logger.info(String.format("[%s:%d] Received an acknowledgment for the %s request from the host.", connection.getDestinationIPAddress(), connection.getDestinationPort(), packetName));
+                        logger.info(String.format("[%s:%d] Received an acknowledgment for the request from the host.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
                         running = false;
                         isSuccess = true;
                     } else if (header.getType() == Constants.TYPE.NACK.getValue()) {
-                        logger.warn(String.format("[%s:%d] Received negative acknowledgment for the %s request from the host. Not retrying.", connection.getDestinationIPAddress(), connection.getDestinationPort(), packetName));
+                        logger.warn(String.format("[%s:%d] Received negative acknowledgment for the request from the host. Not retrying.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
                         running = false;
                     } else {
-                        logger.warn(String.format("[%s:%d] Received wrong packet type i.e. %d for the %s request from the host. Retrying.", connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getType(), packetName));
+                        logger.warn(String.format("[%s:%d] Received wrong packet type i.e. %d for the request from the host. Retrying.", connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getType()));
                         connection.send(packet);
                     }
                 } else {
-                    logger.warn(String.format("[%s:%d] Received invalid header for the %s request from the host. Retrying.", connection.getDestinationIPAddress(), connection.getDestinationPort(), packetName));
+                    logger.warn(String.format("[%s:%d] Received invalid header for the request from the host. Retrying.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
                     connection.send(packet);
                 }
             } else if (connection.isOpen()) {
-                logger.warn(String.format("[%s:%d] Time-out happen for the packet %s to the host. Re-sending the packet.", connection.getDestinationIPAddress(), connection.getDestinationPort(), packetName));
+                logger.warn(String.format("[%s:%d] Time-out happen for the packet to the host. Re-sending the packet.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
                 connection.send(packet);
             } else {
-                logger.warn(String.format("[%s:%d] Connection is closed by the receiving end. Failed to send %s packet", connection.getDestinationIPAddress(), connection.getDestinationPort(), packetName));
+                logger.warn(String.format("[%s:%d] Connection is closed by the receiving end. Failed to send packet", connection.getDestinationIPAddress(), connection.getDestinationPort()));
             }
+
+            running = retry && running;
         }
 
         connection.resetTimer();
