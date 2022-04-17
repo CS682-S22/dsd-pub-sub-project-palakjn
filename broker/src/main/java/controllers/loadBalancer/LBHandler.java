@@ -24,10 +24,8 @@ public class LBHandler {
     private static final Logger logger = LogManager.getLogger(LBHandler.class);
     private HostService hostService;
     private Connection connection;
-    private Host loadBalancerInfo;
 
-    public LBHandler(Host loadBalancerInfo) {
-        this.loadBalancerInfo = loadBalancerInfo;
+    public LBHandler() {
         hostService = new HostService(logger);
     }
 
@@ -66,7 +64,7 @@ public class LBHandler {
     /**
      * Process the request based on the action received from the load balancer
      */
-    public void processRequest(Header.Content header, byte[] packet) {
+    private void processRequest(Header.Content header, byte[] packet) {
         if (header.getType() == BrokerConstants.TYPE.REQ.getValue()) {
             //Adding new topic information
             byte[] body = BrokerPacketHandler.getData(packet);
@@ -111,6 +109,17 @@ public class LBHandler {
     }
 
     /**
+     * Send new leader information to load balancer
+     */
+    public void sendLeaderUpdate(byte[] packet) {
+        //Get the connection with load balancer
+        if (connect()) {
+            //Send leader info and wait for an ack
+            hostService.sendPacketWithACK(connection, packet, BrokerConstants.ACK_WAIT_TIME, true);
+        }
+    }
+
+    /**
      * Connect with the load balancer.
      */
     private boolean connect() {
@@ -119,7 +128,7 @@ public class LBHandler {
         connection = Channels.get(null, BrokerConstants.CHANNEL_TYPE.LOADBALANCER);
 
         if (connection == null || !connection.isOpen()) {
-            connection = hostService.connect(loadBalancerInfo.getAddress(), loadBalancerInfo.getPort());
+            connection = hostService.connect(CacheManager.getLoadBalancer().getAddress(), CacheManager.getLoadBalancer().getPort());
         }
 
         if (connection != null && connection.isOpen()) {

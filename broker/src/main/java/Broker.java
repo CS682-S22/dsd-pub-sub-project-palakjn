@@ -1,10 +1,9 @@
 import configurations.BrokerConstants;
 import configurations.Config;
 import controllers.Connection;
+import controllers.RequestHandler;
 import controllers.database.CacheManager;
 import controllers.loadBalancer.LBHandler;
-import controllers.RequestHandler;
-import models.Host;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import utilities.JSONDesrializer;
@@ -42,10 +41,11 @@ public class Broker {
             Config config = broker.getConfig(location);
 
             if (broker.isValid(config)) {
-                CacheManager.setBroker(new Host(config.getLocal().getAddress(), config.getLocal().getPort()));
+                CacheManager.setBroker(config.getLocal());
+                CacheManager.setLoadBalancer(config.getLoadBalancer());
 
                 //Joining to the network
-                LBHandler lbHandler = new LBHandler(config.getLoadBalancer());
+                LBHandler lbHandler = new LBHandler();
                 if (lbHandler.join()) {
                     //Starting thread to listen for request/response from load balancer
                     Thread lbThread = new Thread(lbHandler::listen);

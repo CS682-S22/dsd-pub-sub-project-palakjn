@@ -2,6 +2,7 @@ package controllers.election;
 
 import configurations.BrokerConstants;
 import controllers.database.CacheManager;
+import controllers.loadBalancer.LBHandler;
 import controllers.replication.Broker;
 import utilities.BrokerPacketHandler;
 
@@ -25,6 +26,7 @@ public class Election {
 
                 if (isSuccess) {
                     //TODO: Log
+                    //TODO: run the node timer to check if leader information received or not. If not within the timer then, start election again
                 } else {
                     //TODO: faultDetector.markDown(key, highPriorityBroker);
                 }
@@ -36,8 +38,12 @@ public class Election {
             CacheManager.setLeader(key, new Broker(CacheManager.getBrokerInfo()));
 
             //Sending "I am leader" message to other brokers and load balancer
+            sendLeaderUpdate(key);
 
-            //Call "sync" module
+            //Set the broker instance to "Sync"
+            CacheManager.setStatus(key, BrokerConstants.BROKER_STATE.SYNC);
+
+            //TODO: Call sync module
         }
     }
 
@@ -53,6 +59,8 @@ public class Election {
             }
         }
 
-
+        //Sending to load balancer
+        LBHandler handler = new LBHandler();
+        handler.sendLeaderUpdate(packet);
     }
 }

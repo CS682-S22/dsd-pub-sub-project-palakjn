@@ -14,46 +14,55 @@ import org.apache.logging.log4j.Logger;
  * @author Palak Jain
  */
 public class HeartBeatSender {
+    private HostService hostService;
     private static final Logger logger = LogManager.getLogger(HeartBeatSender.class);
+
+    public HeartBeatSender() {
+        hostService = new HostService(logger);
+    }
 
     /**
      * Schedule the task to send heartbeat messages at a fixed interval
      */
     public boolean send(HeartBeatRequest request) {
-        Connection connection = Channels.get(request.getReceivedId(), BrokerConstants.CHANNEL_TYPE.HEARTBEAT);
+        Connection connection = connect(request.getReceivedId());
 
-        if (connection == null || !connection.isOpen()) {
-            connection = connect(request.getReceivedId());
+        if (connection != null) {
+            Runnable task = new HeartBeatTask(connection, request);
+            HeartBeatSchedular.start(request.getKey(), task, BrokerConstants.HEARTBEAT_INTERVAL_MS);
 
-            if (connection != null) {
-                Channels.add(request.getReceivedId(), connection, BrokerConstants.CHANNEL_TYPE.HEARTBEAT);
-            } else {
-                return false;
-            }
+            return true;
         }
 
-        Runnable task = new HeartBeatTask(connection, request);
-        HeartBeatSchedular.start(request.getKey(), task, BrokerConstants.HEARTBEAT_INTERVAL_MS);
-
-        return true;
+        return false;
     }
 
     /**
      * Create the connection with another broker
      */
-    private Connection connect(String receiveId) {
-        Connection connection = null;
-        String address;
-        int port;
+    private synchronized Connection connect(String receiveId) {
+        Connection connection = Channels.get(receiveId, BrokerConstants.CHANNEL_TYPE.HEARTBEAT);;
 
-        String[] parts = receiveId.split(":");
+        if (connection == null || !connection.isOpen()) {
+            String address;
+            int port;
 
-        if (parts.length == 2) {
-            address = parts[0];
-            port = Integer.parseInt(parts[1]);
+            String[] parts = receiveId.split(":");
 
-            HostService hostService = new HostService(logger);
-            connection = hostService.connect(address, port);
+            if (parts.length == 2) {
+                address = parts[0];
+                port = Integer.parseInt(parts[1]);
+
+                connection = hostService.connect(address, port);
+
+                if (connection != null && connection.isOpen()) {
+                    Channels.add(receiveId, connection, BrokerConstants.CHANNEL_TYPE.HEARTBEAT);
+                } else {
+                    connection = null;
+                }
+            } else {
+                connection = null;
+            }
         }
 
         return connection;

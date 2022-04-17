@@ -22,6 +22,9 @@ public class CacheManager {
     //Details of local broker
     private static Host broker;
 
+    //Details of load balancer
+    private static Host loadBalancer;
+
     //Status of the broker for the partition it is holding
     private static Map<String, BrokerConstants.BROKER_STATE> brokerStatus = new HashMap<>();
 
@@ -56,6 +59,20 @@ public class CacheManager {
      */
     public static void setBroker(Host host) {
         broker = host;
+    }
+
+    /**
+     * Get the load balancer details
+     */
+    public static Host getLoadBalancer() {
+        return loadBalancer;
+    }
+
+    /**
+     * Set the load balancer details
+     */
+    public static void setLoadBalancer(Host loadBalancer) {
+        CacheManager.loadBalancer = loadBalancer;
     }
 
     /**
