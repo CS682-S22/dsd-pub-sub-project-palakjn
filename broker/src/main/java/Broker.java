@@ -42,21 +42,28 @@ public class Broker {
             Config config = broker.getConfig(location);
 
             if (broker.isValid(config)) {
+                CacheManager.setBroker(new Host(config.getLocal().getAddress(), config.getLocal().getPort()));
 
                 //Joining to the network
-                LBHandler lbHandler = new LBHandler();
-                if (lbHandler.join(config.getLocal(), config.getLoadBalancer())) {
-                    CacheManager.setBroker(new Host(config.getLocal().getAddress(), config.getLocal().getPort()));
+                LBHandler lbHandler = new LBHandler(config.getLoadBalancer());
+                if (lbHandler.join()) {
+                    //Starting thread to listen for request/response from load balancer
+                    Thread lbThread = new Thread(lbHandler::listen);
+                    lbThread.start();
 
-                    //Listening for the DATA/SYNC connections
                     logger.info(String.format("[%s] Listening on DATA/SYNC port %d.", config.getLocal().getAddress(), config.getLocal().getPort()));
                     System.out.printf("[%s] Listening on DATA/SYNC port %d.\n", config.getLocal().getAddress(), config.getLocal().getPort());
-                    broker.listen(config.getLocal().getAddress(), config.getLocal().getPort());
 
-                    //Listening for the HEARTBEAT/ELECTION connections
+                    //Starting thread to listen for the DATA/SYNC connections
+                    Thread dataConnectionThread = new Thread(() -> broker.listen(config.getLocal().getAddress(), config.getLocal().getPort()));
+                    dataConnectionThread.start();
+
+                    //Starting thread to listen for the HEARTBEAT/ELECTION connections
                     logger.info(String.format("[%s] Listening on HEARTBEAT/ELECTION port %d.", config.getHeartBeatServer().getAddress(), config.getHeartBeatServer().getPort()));
                     System.out.printf("[%s] Listening on HEARTBEAT/ELECTION port %d.\n", config.getHeartBeatServer().getAddress(), config.getHeartBeatServer().getPort());
-                    broker.listen(config.getHeartBeatServer().getAddress(), config.getHeartBeatServer().getPort());
+
+                    Thread heartBeatThread = new Thread(() -> broker.listen(config.getHeartBeatServer().getAddress(), config.getHeartBeatServer().getPort()));
+                    heartBeatThread.start();
                 }
             }
         }

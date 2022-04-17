@@ -58,6 +58,14 @@ public class HostService {
     }
 
     /**
+     * Send an acknowledgment response to the host
+     */
+    public void sendACK(Connection connection, Constants.REQUESTER requester) {
+        byte[] acknowledgement = PacketHandler.createACK(requester, 0);
+        connection.send(acknowledgement);
+    }
+
+    /**
      * Send the negative acknowledgment response to the host
      */
     public void sendNACK(Connection connection, Constants.REQUESTER requester) {

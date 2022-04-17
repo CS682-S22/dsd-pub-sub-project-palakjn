@@ -2,6 +2,7 @@ package controllers.loadBalancer;
 
 import configuration.Constants;
 import configurations.BrokerConstants;
+import controllers.Channels;
 import controllers.Connection;
 import controllers.HostService;
 import controllers.database.CacheManager;
@@ -13,10 +14,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import utilities.BrokerPacketHandler;
 import utilities.JSONDesrializer;
-import utilities.PacketHandler;
-
-import java.io.IOException;
-import java.net.Socket;
 
 /**
  * Responsible for handling requests from load balancer.
@@ -27,36 +24,49 @@ public class LBHandler {
     private static final Logger logger = LogManager.getLogger(LBHandler.class);
     private HostService hostService;
     private Connection connection;
+    private Host loadBalancerInfo;
 
-    public LBHandler(Connection connection) {
-        this.connection = connection;
-        hostService = new HostService(logger);
-    }
-
-    public LBHandler() {
+    public LBHandler(Host loadBalancerInfo) {
+        this.loadBalancerInfo = loadBalancerInfo;
         hostService = new HostService(logger);
     }
 
     /**
      * Send the request to load balancer to join the network
      */
-    public boolean join(Host brokerInfo, Host loadBalancerInfo) {
-        return send(brokerInfo, loadBalancerInfo, BrokerConstants.REQUEST_TYPE.ADD);
+    public boolean join() {
+        return send(BrokerConstants.REQUEST_TYPE.ADD);
     }
 
     /**
      * Send the request to load balancer to remove it from the network
      */
-    public boolean remove(Host brokerInfo, Host loadBalancerInfo) {
-        return send(brokerInfo, loadBalancerInfo, BrokerConstants.REQUEST_TYPE.REM);
+    public boolean remove() {
+        return send(BrokerConstants.REQUEST_TYPE.REM);
+    }
+
+    /**
+     * Listen for requests from load balancer
+     */
+    public void listen() {
+        if (connect()) {
+            while (connection.isOpen()) {
+                byte[] request = connection.receive();
+
+                if (request != null) {
+                    Header.Content header = BrokerPacketHandler.getHeader(request);
+
+                    logger.info("Received request from Load Balancer.");
+                    processRequest(header, request);
+                }
+            }
+        }
     }
 
     /**
      * Process the request based on the action received from the load balancer
      */
-    public boolean processRequest(Header.Content header, byte[] packet) {
-        boolean isSuccess = false;
-
+    public void processRequest(Header.Content header, byte[] packet) {
         if (header.getType() == BrokerConstants.TYPE.REQ.getValue()) {
             //Adding new topic information
             byte[] body = BrokerPacketHandler.getData(packet);
@@ -81,7 +91,6 @@ public class LBHandler {
                             addTopic(topic);
 
                             hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
-                            isSuccess = true;
                         } else {
                             logger.warn(String.format("[%s:%d] Received no partitions for the topic %s from the load balancer. Will send NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
                             hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
@@ -99,8 +108,26 @@ public class LBHandler {
             logger.warn(String.format("[%s:%d] Received unsupported action %d from the load balancer. Will send NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getType()));
             hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
         }
+    }
 
-        return isSuccess;
+    /**
+     * Connect with the load balancer.
+     */
+    private boolean connect() {
+        boolean isConnected = false;
+
+        connection = Channels.get(null, BrokerConstants.CHANNEL_TYPE.LOADBALANCER);
+
+        if (connection == null || !connection.isOpen()) {
+            connection = hostService.connect(loadBalancerInfo.getAddress(), loadBalancerInfo.getPort());
+        }
+
+        if (connection != null && connection.isOpen()) {
+            Channels.upsert(null, connection, BrokerConstants.CHANNEL_TYPE.LOADBALANCER);
+            isConnected = true;
+        }
+
+        return isConnected;
     }
 
     /**
@@ -133,76 +160,54 @@ public class LBHandler {
     }
 
     /**
-     * Send the request to add/remove to the load balancer
-     */
-    private boolean send(Host brokerInfo, Host loadBalancerInfo, String type) {
-        boolean isSuccess = false;
-
-        try {
-            Socket socket = new Socket(loadBalancerInfo.getAddress(), loadBalancerInfo.getPort());
-            logger.info(String.format("[%s:%d] Successfully connected to load balancer %s: %d.", brokerInfo.getAddress(), brokerInfo.getPort(), loadBalancerInfo.getAddress(), loadBalancerInfo.getPort()));
-
-            Connection connection = new Connection(socket, loadBalancerInfo.getAddress(), loadBalancerInfo.getPort(), brokerInfo.getAddress(), brokerInfo.getPort());
-            if (connection.openConnection()) {
-                byte[] packet = BrokerPacketHandler.createPacket(brokerInfo, type);
-                isSuccess = send(connection, packet, String.format("%s:%s", BrokerConstants.REQUESTER.BROKER.name(), type));
-                if (isSuccess) {
-                    logger.info("Successfully joined to the network");
-                    System.out.println("Successfully joined to the network");
-                }
-            }
-        } catch (IOException exception) {
-            logger.error(String.format("[%s:%d] Fail to make connection with the load balancer %s:%d. ", brokerInfo.getAddress(), brokerInfo.getPort(), loadBalancerInfo.getAddress(), loadBalancerInfo.getPort()), exception);
-        }
-
-        return isSuccess;
-    }
-
-    /**
      * Send the packet to the host and waits for an acknowledgement. Re-send the packet if time-out
      */
-    public boolean send(Connection connection, byte[] packet, String type) {
+    private boolean send(String type) {
         boolean isSuccess = false;
-        boolean running = true;
 
-        connection.send(packet);
-        connection.setTimer(Constants.ACK_WAIT_TIME);
+        if (connect()) {
+            boolean running = true;
+            byte[] packet = BrokerPacketHandler.createPacket(CacheManager.getBrokerInfo(), type);
 
-        while (running && connection.isOpen()) {
-            byte[] responseBytes = connection.receive();
+            connection.send(packet);
+            connection.setTimer(Constants.ACK_WAIT_TIME);
 
-            if (responseBytes != null) {
-                Header.Content header = BrokerPacketHandler.getHeader(responseBytes);
+            while (running && connection.isOpen()) {
+                byte[] responseBytes = connection.receive();
 
-                if (header != null) {
-                    if (header.getType() == Constants.TYPE.ACK.getValue() && type.equalsIgnoreCase(BrokerConstants.REQUEST_TYPE.REM)) {
-                        logger.info(String.format("[%s:%d] Received an acknowledgment for the %s request from the host %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                        running = false;
-                        isSuccess = true;
-                    } else if (header.getType() == Constants.TYPE.NACK.getValue() && type.equalsIgnoreCase(BrokerConstants.REQUEST_TYPE.REM)) {
-                        logger.warn(String.format("[%s:%d] Received negative acknowledgment for the %s request from the host %s:%d. Not retrying.", connection.getSourceIPAddress(), connection.getSourcePort(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                        running = false;
-                    } else if (header.getType() == Constants.TYPE.RESP.getValue() && type.equalsIgnoreCase(Constants.REQUEST_TYPE.ADD)) {
-                        logger.info(String.format("[%s:%d] Received a response for the %s request from the host %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                if (responseBytes != null) {
+                    Header.Content header = BrokerPacketHandler.getHeader(responseBytes);
 
-                        running = !getPriorityNum(responseBytes);
+                    if (header != null) {
+                        if (header.getType() == Constants.TYPE.ACK.getValue() && type.equalsIgnoreCase(BrokerConstants.REQUEST_TYPE.REM)) {
+                            logger.info(String.format("[%s:%d] Received an acknowledgment for the %s request from the host %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                            running = false;
+                            isSuccess = true;
+                        } else if (header.getType() == Constants.TYPE.NACK.getValue() && type.equalsIgnoreCase(BrokerConstants.REQUEST_TYPE.REM)) {
+                            logger.warn(String.format("[%s:%d] Received negative acknowledgment for the %s request from the host %s:%d. Not retrying.", connection.getSourceIPAddress(), connection.getSourcePort(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                            running = false;
+                        } else if (header.getType() == Constants.TYPE.RESP.getValue() && type.equalsIgnoreCase(Constants.REQUEST_TYPE.ADD)) {
+                            logger.info(String.format("[%s:%d] Received a response for the %s request from the host %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+
+                            running = !getPriorityNum(responseBytes);
+                        } else {
+                            logger.warn(String.format("[%s:%d] Received wrong packet type i.e. %d for the %s request from the host %s:%d. Retrying.", connection.getSourceIPAddress(), connection.getSourcePort(), header.getType(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                            connection.send(packet);
+                        }
                     } else {
-                        logger.warn(String.format("[%s:%d] Received wrong packet type i.e. %d for the %s request from the host %s:%d. Retrying.", connection.getSourceIPAddress(), connection.getSourcePort(), header.getType(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                        logger.warn(String.format("[%s:%d] Received invalid header for the %s request from the host %s:%d. Retrying.", connection.getSourceIPAddress(), connection.getSourcePort(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
                         connection.send(packet);
                     }
-                } else {
-                    logger.warn(String.format("[%s:%d] Received invalid header for the %s request from the host %s:%d. Retrying.", connection.getSourceIPAddress(), connection.getSourcePort(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                } else if (connection.isOpen()) {
+                    logger.warn(String.format("[%s:%d] Time-out happen for the packet %s to the host %s:%d. Re-sending the packet.", connection.getSourceIPAddress(), connection.getSourcePort(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
                     connection.send(packet);
+                } else {
+                    logger.warn(String.format("[%s:%d] Connection is closed by the receiving end %s:%d. Failed to send %s packet", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort(), type));
                 }
-            } else if (connection.isOpen()) {
-                logger.warn(String.format("[%s:%d] Time-out happen for the packet %s to the host %s:%d. Re-sending the packet.", connection.getSourceIPAddress(), connection.getSourcePort(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                connection.send(packet);
-            } else {
-                logger.warn(String.format("[%s:%d] Connection is closed by the receiving end %s:%d. Failed to send %s packet", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort(), type));
             }
-        }
 
-        connection.resetTimer();
+            connection.resetTimer();
+        }
 
         return isSuccess;
     }

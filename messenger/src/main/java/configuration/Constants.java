@@ -165,6 +165,13 @@ public class Constants {
         }
     }
 
+    public enum CHANNEL_TYPE {
+        HEARTBEAT,
+        DATA,
+        LOADBALANCER,
+        BROKER
+    }
+
     public static class BROKER_STATUS {
         public static String ACTIVE = "ACTIVE";
         public static String INACTIVE = "INACTIVE";

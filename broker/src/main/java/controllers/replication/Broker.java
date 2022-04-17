@@ -3,7 +3,7 @@ package controllers.replication;
 import configurations.BrokerConstants;
 import controllers.Connection;
 import controllers.HostService;
-import controllers.connections.Channels;
+import controllers.Channels;
 import models.Host;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

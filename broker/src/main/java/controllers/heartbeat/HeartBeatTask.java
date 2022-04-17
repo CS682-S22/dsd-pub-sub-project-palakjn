@@ -2,7 +2,7 @@ package controllers.heartbeat;
 
 import configurations.BrokerConstants;
 import controllers.Connection;
-import controllers.connections.Channels;
+import controllers.Channels;
 import models.HeartBeatRequest;
 import utilities.BrokerPacketHandler;
 

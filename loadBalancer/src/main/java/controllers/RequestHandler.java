@@ -28,7 +28,6 @@ public class RequestHandler {
     private static final Logger logger = LogManager.getLogger(RequestHandler.class);
     private HostService hostService;
     private Connection connection;
-    private int curSeq = 0;
 
     public RequestHandler(Connection connection) {
         this.connection = connection;
@@ -48,26 +47,16 @@ public class RequestHandler {
                 Header.Content header = LBPacketHandler.getHeader(request);
 
                 if (header.getRequester() == Constants.REQUESTER.BROKER.getValue()) {
-                    if (header.getSeqNum() == curSeq) {
-                        logger.info(String.format("[%s:%d] Received request from broker with sequence number: %d", connection.getDestinationIPAddress(), connection.getDestinationPort(), curSeq));
-                        processBrokerRequest(request, Constants.TYPE.values()[header.getType()].name());
-                    } else if (header.getSeqNum() < curSeq) {
-                        logger.info(String.format("[%s:%d] Received another same request from broker with sequence number: %d. Sending acknowledgement.", connection.getDestinationIPAddress(), connection.getDestinationPort(), curSeq));
-                        hostService.sendACK(connection, Constants.REQUESTER.LOAD_BALANCER, header.getSeqNum());
-                    }
+                    logger.info(String.format("[%s:%d] Received request from broker", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                    processBrokerRequest(request, Constants.TYPE.values()[header.getType()].name());
                 } else if ((header.getRequester() == Constants.REQUESTER.PRODUCER.getValue() ||
                         header.getRequester() == Constants.REQUESTER.CONSUMER.getValue()) &&
                         header.getType() == Constants.TYPE.REQ.getValue()) {
                     logger.info(String.format("[%s:%d] Received request from %s to get broker details for a partition/topic.", connection.getDestinationIPAddress(), connection.getDestinationPort(), Constants.REQUESTER.values()[header.getRequester()].name()));
                     sendBrokerDetails(request);
                 } else if (header.getRequester() == Constants.REQUESTER.TOPIC.getValue()) {
-                    if (header.getSeqNum() == curSeq) {
-                        logger.info(String.format("[%s:%d] Received request from host with sequence number: %d to create the topic", connection.getDestinationIPAddress(), connection.getDestinationPort(), curSeq));
-                        processTopicRequest(request);
-                    } else if (header.getSeqNum() < curSeq) {
-                        logger.info(String.format("[%s:%d] Received another same request from host with sequence number: %d to create the topic. Sending an acknowledgement.", connection.getDestinationIPAddress(), connection.getDestinationPort(), curSeq));
-                        hostService.sendACK(connection, Constants.REQUESTER.LOAD_BALANCER, header.getSeqNum());
-                    }
+                    logger.info(String.format("[%s:%d] Received request from host to create the topic", connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                    processTopicRequest(request);
                 }
             } else {
                 running = false;
@@ -93,6 +82,9 @@ public class RequestHandler {
                             logger.warn(String.format("[%s:%d] Received JOIN request from the broker. Adding the broker to the collection.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
                             broker = CacheManager.addBroker(broker);
 
+                            //Saving the connection between broker and load-balancer for future updates
+                            Channels.add(broker.getString(), connection, Constants.CHANNEL_TYPE.LOADBALANCER);
+
                             //Sending response to the broker with the priority number
                             sendJoinResponse(broker);
 
@@ -101,14 +93,14 @@ public class RequestHandler {
                         } else if (request.getType().equalsIgnoreCase(Constants.REQUEST_TYPE.REM)) {
                             logger.warn(String.format("[%s:%d] Received REMOVE request from the broker. Removing the broker from the collection.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
                             CacheManager.removeBroker(broker);
-                            sendAck();
+                            hostService.sendACK(connection, Constants.REQUESTER.LOAD_BALANCER);
                         } else {
                             logger.warn(String.format("[%s:%d] Received unsupported request type %s from the broker. Sending NACK packet.", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getType()));
-                            hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
+                            hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER);
                         }
                     } else {
                         logger.warn(String.format("[%s:%d] Received invalid broker information from the broker. Sending NACK packet.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                        hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
+                        hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER);
                     }
                 }
             } else if (type.equals(Constants.TYPE.UPDATE.name())) {
@@ -131,7 +123,7 @@ public class RequestHandler {
                 }
             } else {
                 logger.warn(String.format("[%s:%d] Received unsupported header type %s from the broker. Sending NACK packet.", connection.getDestinationIPAddress(), connection.getDestinationPort(), type));
-                hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
+                hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER);
             }
         }
     }
@@ -200,11 +192,11 @@ public class RequestHandler {
                     createTopic(topicRequest);
                 } else {
                     logger.warn(String.format("[%s:%d] Received unsupported action %s for the topic related service. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), request.getType()));
-                    hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
+                    hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER);
                 }
             } else {
                 logger.warn(String.format("[%s:%d] Received invalid requests to create the topic. Sending NACK", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
+                hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER);
             }
         }
     }
@@ -217,10 +209,10 @@ public class RequestHandler {
     private synchronized void createTopic(CreateTopicRequest topic) {
         if (CacheManager.isTopicExist(topic.getName())) {
             logger.warn(String.format("[%s:%d] Topic with the name %s already exist. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
-            hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
+            hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER);
         } else if (CacheManager.getNumberOfBrokers() < (topic.getNumOfFollowers() + 1)) {
             logger.warn(String.format("[%s:%d] Less number of brokers %d available for creating topic with the name %s. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), CacheManager.getNumberOfBrokers(), topic.getName()));
-            hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
+            hostService.sendNACK(connection, Constants.REQUESTER.LOAD_BALANCER);
         } else {
             logger.debug(String.format("[%s:%d] Request received for distributing %d number of partitions of topic %s among %d number of brokers", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getNumOfPartitions(), topic.getName(), CacheManager.getNumberOfBrokers()));
             Topic newTopic = new Topic(topic.getName(), topic.getNumOfFollowers());
@@ -240,7 +232,7 @@ public class RequestHandler {
             }
 
             CacheManager.addTopic(newTopic);
-            sendAck();
+            hostService.sendACK(connection, Constants.REQUESTER.LOAD_BALANCER);
             logger.debug(String.format("[%s:%d] Created topic %s with %d number of partitions. Sending the information to the respective brokers.",connection.getDestinationIPAddress(), connection.getDestinationPort(), newTopic.getName(), newTopic.getNumOfPartitions()));
 
             //Send partition information to all the brokers asynchronously. Assuming that all the brokers might be up and running
@@ -269,33 +261,38 @@ public class RequestHandler {
      * Send the partitions' information of a topic to the broker which is going to handle them.
      */
     private void sendToBroker(Topic topic) {
-        try {
-            Host brokerInfo = topic.getPartitions().get(0).getLeader();
-            Socket socket = new Socket(brokerInfo.getAddress(), brokerInfo.getPort());
-            Connection connection = new Connection(socket, brokerInfo.getAddress(), brokerInfo.getPort(), this.connection.getSourceIPAddress(), this.connection.getSourcePort());
-            if (connection.openConnection()) {
-                logger.debug(String.format("[%s:%d] Sending the the topic %s - Partitions {%s} information to the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getPartitionString()));
-                Request<Topic> request = new Request<>(Constants.REQUEST_TYPE.ADD, topic);
-                byte[] packet = LBPacketHandler.createPacket(Constants.TYPE.REQ, request);
-                boolean isSuccess = hostService.sendPacketWithACK(connection, packet, Constants.ACK_WAIT_TIME);
-                if (isSuccess) {
-                    logger.info(String.format("[%s:%d] Send the topic %s - Partitions {%s} information to the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getPartitionString()));
-                } else {
-                    //Removing topic information from the cache.
-                    CacheManager.removePartitions(topic);
-                }
+        Host brokerInfo = topic.getPartitions().get(0).getLeader();
+        Connection connection = connect(brokerInfo);
+
+        if (connection != null && connection.isOpen()) {
+            logger.debug(String.format("[%s:%d] Sending the the topic %s - Partitions {%s} information to the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getPartitionString()));
+            Request<Topic> request = new Request<>(Constants.REQUEST_TYPE.ADD, topic);
+            byte[] packet = LBPacketHandler.createPacket(Constants.TYPE.REQ, request);
+            boolean isSuccess = hostService.sendPacketWithACK(connection, packet, Constants.ACK_WAIT_TIME);
+            if (isSuccess) {
+                logger.info(String.format("[%s:%d] Send the topic %s - Partitions {%s} information to the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getPartitionString()));
+            } else {
+                //Removing topic information from the cache.
+                CacheManager.removePartitions(topic);
             }
-        } catch (IOException exception) {
-            logger.error(String.format("[%s:%d] Fail to make connection with the broker in order to send the topic %s - Partitions {%s} information", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getPartitionString()), exception);
         }
     }
 
     /**
-     * Send an acknowledgement and increment the sequence number which is expected to read for next request
+     * Connect with the broker
      */
-    private void sendAck() {
-        hostService.sendACK(connection, Constants.REQUESTER.LOAD_BALANCER, curSeq);
-        curSeq++;
+    private Connection connect(Host brokerInfo) {
+        Connection connection = Channels.get(brokerInfo.getString(), Constants.CHANNEL_TYPE.BROKER);
+
+        if (connection == null || !connection.isOpen()) {
+            connection = hostService.connect(brokerInfo.getAddress(), brokerInfo.getPort());
+        }
+
+        if (connection != null && connection.isOpen()) {
+            Channels.upsert(brokerInfo.getString(), connection, Constants.CHANNEL_TYPE.BROKER);
+        }
+
+        return connection;
     }
 
     /**
@@ -304,6 +301,5 @@ public class RequestHandler {
     private void sendJoinResponse(Host broker) {
         byte[] response = LBPacketHandler.createJoinResponse(broker.getPriorityNum());
         connection.send(response);
-        curSeq++;
     }
 }

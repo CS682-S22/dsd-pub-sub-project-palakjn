@@ -30,7 +30,6 @@ public class RequestHandler {
      */
     public void process() {
         boolean running = true;
-        int curSeq = 0;
 
         while (running && connection.isOpen()) {
             byte[] request = connection.receive();
@@ -38,17 +37,7 @@ public class RequestHandler {
             if (request != null) {
                 Header.Content header = BrokerPacketHandler.getHeader(request);
 
-                if (header.getRequester() == BrokerConstants.REQUESTER.LOAD_BALANCER.getValue()) {
-                    logger.info("Received request from Load Balancer.");
-                    if (header.getSeqNum() == curSeq) {
-                        LBHandler lbHandler = new LBHandler(connection);
-                        if (lbHandler.processRequest(header, request)) {
-                            curSeq++;
-                        }
-                    } else if (header.getSeqNum() < curSeq) {
-                        hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
-                    }
-                } else if (header.getRequester() == BrokerConstants.REQUESTER.PRODUCER.getValue()) {
+                if (header.getRequester() == BrokerConstants.REQUESTER.PRODUCER.getValue()) {
                     logger.info("Received request from Producer.");
                     ProducerHandler producerHandler = new ProducerHandler(connection);
                     producerHandler.processRequest(header, request);
