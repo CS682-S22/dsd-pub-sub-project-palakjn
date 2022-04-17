@@ -6,6 +6,8 @@ import controllers.Channels;
 import controllers.Connection;
 import controllers.HostService;
 import controllers.database.CacheManager;
+import controllers.election.Election;
+import controllers.heartbeat.HeartBeatSender;
 import controllers.replication.Broker;
 import models.*;
 import models.requests.Request;
@@ -24,9 +26,13 @@ public class LBHandler {
     private static final Logger logger = LogManager.getLogger(LBHandler.class);
     private HostService hostService;
     private Connection connection;
+    private HeartBeatSender heartBeatSender;
+    private Election election;
 
     public LBHandler() {
         hostService = new HostService(logger);
+        heartBeatSender = new HeartBeatSender();
+        election = new Election();
     }
 
     /**
@@ -83,9 +89,16 @@ public class LBHandler {
 
                         //First checking if topic already exits
                         if (CacheManager.iSTopicExist(topic.getName())) {
-                            logger.warn(String.format("[%s:%d] Broker already handling the topic %s. Will send NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
-                            hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                            if (isTopicWithPartitionsExist(topic)) {
+                                //TODO: log
+                                updateTopic(topic);
+                                hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                            } else {
+                                //TODO: log
+                                hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                            }
                         } else if (topic.getNumOfPartitions() > 0) {
+                            //TODO: log
                             addTopic(topic);
 
                             hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
@@ -140,7 +153,7 @@ public class LBHandler {
     }
 
     /**
-     * Add the topic information to local DB
+     * Add the new topic information to local DB
      */
     private void addTopic(Topic topic) {
         CacheManager.addTopic(topic.getName());
@@ -150,11 +163,33 @@ public class LBHandler {
             if (file.initialize(String.format(BrokerConstants.TOPIC_LOCATION, connection.getSourceIPAddress(), connection.getSourcePort()), partition.getTopicName(), partition.getNumber())) {
                 CacheManager.addPartition(partition.getTopicName(), partition.getNumber(), file);
 
-                //Adding leader information of the given topic
-                CacheManager.setLeader(file.getName(), new Broker(partition.getLeader()));
+                if (partition.getLeader() != null) {
+                    //Adding leader information of the given topic
+                    CacheManager.setLeader(partition.getString(), new Broker(partition.getLeader()));
+                }
 
                 for (Host broker : partition.getBrokers()) {
-                    CacheManager.addBroker(file.getName(), new Broker(broker));
+                    CacheManager.addBroker(partition.getString(), new Broker(broker));
+
+                    //Start sending heartbeat messages to another brokers
+                    HeartBeatRequest heartBeatRequest = new HeartBeatRequest(partition.getString(), CacheManager.getBrokerInfo().getString(), broker.getString());
+                    heartBeatSender.send(heartBeatRequest);
+                }
+
+                if (CacheManager.isLeader(partition.getString(), CacheManager.getBrokerInfo())) {
+                    //If the current broker is leader of the topic then, change the status to READY
+                    CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.READY);
+                } else {
+                    //If the current broker is follower of the topic then,
+                    if (partition.getLeader() == null || !partition.getLeader().isActive()) {
+                        // If the leader for the given partition is null then, start the election
+                        CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.ELECTION);
+                        election.start(partition.getString());
+                    } else {
+                        // If the leader is active then, changing the status to SYNC mode and starting catching up with leader
+                        CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.SYNC);
+                        //TODO: Call sync mode
+                    }
                 }
 
                 logger.info(String.format("[%s:%d] Added topic %s - partition %d information to the local cache.", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
@@ -163,6 +198,45 @@ public class LBHandler {
                 logger.warn(String.format("[%s:%d] Fail to create directory for the topic- %s - Partition %d", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
             }
         }
+    }
+
+    /**
+     * Checking if new follower information received from load balancer and starting handshake with new follower
+     */
+    private void updateTopic(Topic topic) {
+        for (Partition partition : topic.getPartitions()) {
+            for (Host broker : partition.getBrokers()) {
+                if (!CacheManager.isExist(partition.getString(), broker)) {
+                    //TODO: Log
+
+                    //Start sending heartbeat messages to the broker
+                    HeartBeatRequest heartBeatRequest = new HeartBeatRequest(partition.getString(), CacheManager.getBrokerInfo().getString(), broker.getString());
+                    heartBeatSender.send(heartBeatRequest);
+                }
+
+                if (partition.getLeader() == null || !partition.getLeader().isActive()) {
+                    // If the leader for the given partition is null then, start the election
+                    CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.ELECTION);
+                    election.start(partition.getString());
+                } else {
+                    //If new follower is added, then keep the status of current broker for the partition as READY
+                    CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.READY);
+                }
+            }
+        }
+    }
+
+    /**
+     * Checks whether the topic along with partitions exist
+     */
+    private boolean isTopicWithPartitionsExist(Topic topic) {
+        boolean exist = true;
+
+        for (Partition partition : topic.getPartitions()) {
+            exist = CacheManager.isExist(partition.getTopicName(), partition.getNumber()) && exist;
+        }
+
+        return exist;
     }
 
     /**

@@ -40,6 +40,7 @@ public class CacheManager {
     private static Map<String, Brokers> brokers = new HashMap<>();
 
     //Lock to make data structures thread-safe
+    private static ReentrantReadWriteLock topicLock = new ReentrantReadWriteLock();
     private static ReentrantReadWriteLock subscriberLock = new ReentrantReadWriteLock();
     private static ReentrantReadWriteLock leadersLock = new ReentrantReadWriteLock();
     private static ReentrantReadWriteLock brokerLock = new ReentrantReadWriteLock();
@@ -107,35 +108,61 @@ public class CacheManager {
      * Add the topic to the collection
      */
     public static void addTopic(String topic) {
+        topicLock.writeLock().lock();
+
         topics.add(topic);
+
+        topicLock.writeLock().unlock();
     }
 
     /**
      * Checks if topic with the given name exists
      */
     public static boolean iSTopicExist(String topic) {
-        return topics.contains(topic);
+        topicLock.readLock().lock();
+
+        try {
+            return topics.contains(topic);
+        } finally {
+            topicLock.readLock().unlock();
+        }
     }
 
     /**
      * Add topic, partition information which broker going to handle to the map.
      */
     public static void addPartition(String topic, int partition, File file) {
+        topicLock.writeLock().lock();
+
         partitions.put(getKey(topic, partition), file);
+
+        topicLock.writeLock().unlock();
     }
 
     /**
      * Checks if the broker handling the given partition of the topic
      */
     public static boolean isExist(String topic, int partition) {
-        return partitions.containsKey(getKey(topic, partition));
+        topicLock.readLock().lock();
+
+        try {
+            return partitions.containsKey(getKey(topic, partition));
+        } finally {
+            topicLock.readLock().unlock();
+        }
     }
 
     /**
      * Get the file holding given partition of the topic information
      */
     public static File getPartition(String topic, int partition) {
-        return partitions.getOrDefault(getKey(topic, partition), null);
+        topicLock.readLock().lock();
+
+        try {
+            return partitions.getOrDefault(getKey(topic, partition), null);
+        } finally {
+            topicLock.readLock().unlock();
+        }
     }
 
     /**
@@ -330,5 +357,19 @@ public class CacheManager {
 
         brokerLock.readLock().unlock();
         return broker;
+    }
+
+    /**
+     * Checks whether the given broker handling the partition of the topic
+     */
+    public static boolean isExist(String key, Host broker) {
+        boolean exist;
+        brokerLock.readLock().lock();
+
+        Brokers brokers = getBrokers(key);
+        exist = brokers.contains(broker);
+
+        brokerLock.readLock().unlock();
+        return exist;
     }
 }

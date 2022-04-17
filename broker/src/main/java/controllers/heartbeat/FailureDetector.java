@@ -1,6 +1,7 @@
 package controllers.heartbeat;
 
 import configurations.BrokerConstants;
+import controllers.Channels;
 import controllers.database.CacheManager;
 import controllers.loadBalancer.LBHandler;
 import controllers.replication.Broker;
@@ -63,6 +64,9 @@ public class FailureDetector {
         //Letting load balancer know about it
         byte[] packet = BrokerPacketHandler.createFailBrokerPacket(key, broker);
         lbHandler.sendLeaderUpdate(packet);
+
+        //Close down connection
+        Channels.remove(serverId);
     }
 
     /**
