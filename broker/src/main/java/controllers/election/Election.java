@@ -2,13 +2,26 @@ package controllers.election;
 
 import configurations.BrokerConstants;
 import controllers.database.CacheManager;
+import controllers.heartbeat.FailureDetector;
 import controllers.loadBalancer.LBHandler;
 import controllers.replication.Broker;
+import models.ElectionRequest;
+import models.Host;
+import models.requests.Request;
 import utilities.BrokerPacketHandler;
+import utilities.JSONDesrializer;
 
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class Election {
+    private Timer timer;
+    private FailureDetector failureDetector;
+
+    public Election() {
+        failureDetector = new FailureDetector();
+    }
 
     public void start(String key) {
         //Change the broker state to "Election"
@@ -26,9 +39,19 @@ public class Election {
 
                 if (isSuccess) {
                     //TODO: Log
-                    //TODO: run the node timer to check if leader information received or not. If not within the timer then, start election again
+                    timer = new Timer();
+                    TimerTask task = new TimerTask() {
+                        @Override
+                        public void run() {
+                            checkForLeaderUpdate(key);
+                            timer.cancel();
+                            this.cancel();
+                        }
+                    };
+                    timer.schedule(task, BrokerConstants.ELECTION_RESPONSE_WAIT_TIME);
                 } else {
-                    //TODO: faultDetector.markDown(key, highPriorityBroker);
+                    //TODO: Log
+                    failureDetector.markDown(key, highPriorityBroker.getString());
                 }
             }
         } else {
@@ -47,6 +70,27 @@ public class Election {
         }
     }
 
+    public void handleRequest(byte[] message) {
+        byte[] data = BrokerPacketHandler.getData(message);
+
+        if (data != null) {
+            Request<ElectionRequest> electionRequest = JSONDesrializer.fromJson(data, Request.class);
+
+            if (electionRequest != null && electionRequest.getRequest() != null) {
+                ElectionRequest request = electionRequest.getRequest();
+
+                if (CacheManager.getStatus(request.getKey()) != BrokerConstants.BROKER_STATE.ELECTION) {
+                    //TODO: Log
+                    start(request.getKey());
+                } else {
+                    //TODO: Log
+                }
+            }
+        } else {
+            //TODO: log
+        }
+    }
+
     private void sendLeaderUpdate(String key) {
         byte[] packet = BrokerPacketHandler.createLeaderUpdateRequest(key, CacheManager.getBrokerInfo());
 
@@ -62,5 +106,17 @@ public class Election {
         //Sending to load balancer
         LBHandler handler = new LBHandler();
         handler.sendLeaderUpdate(packet);
+    }
+
+    private void checkForLeaderUpdate(String key) {
+        Host leader = CacheManager.getLeader(key);
+
+        if (leader != null && leader.isActive()) {
+            //TODO: log that new leader being elected
+            CacheManager.setStatus(key, BrokerConstants.BROKER_STATE.READY);
+        } else {
+            //TODO: log that new leader not being decided yet. Starting election again
+            start(key);
+        }
     }
 }

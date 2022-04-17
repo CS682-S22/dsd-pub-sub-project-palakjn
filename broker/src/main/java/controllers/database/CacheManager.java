@@ -317,4 +317,18 @@ public class CacheManager {
         brokerLock.readLock().unlock();
         return brokers;
     }
+
+    /**
+     * Get the broker with mentioned serverId handling given partition key
+     */
+    public static Broker getBroker(String key, String serverId) {
+        Broker broker = null;
+        brokerLock.readLock().lock();
+
+        Brokers brokers = getBrokers(key);
+        broker = brokers.getBroker(new Broker(serverId));
+
+        brokerLock.readLock().unlock();
+        return broker;
+    }
 }

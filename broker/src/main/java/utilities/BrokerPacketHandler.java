@@ -73,4 +73,14 @@ public class BrokerPacketHandler extends PacketHandler {
 
         return createPacket(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.UPDATE, request);
     }
+
+    /**
+     * Create the packet to indicate load balancer the failure of the broker
+     */
+    public static byte[] createFailBrokerPacket(String key, Host broker) {
+        BrokerUpdateRequest brokerUpdateRequest = new BrokerUpdateRequest(key, broker);
+        Request<BrokerUpdateRequest> request = new Request<>(BrokerConstants.REQUEST_TYPE.FAIL, brokerUpdateRequest);
+
+        return createPacket(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.UPDATE, request);
+    }
 }

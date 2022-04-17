@@ -22,6 +22,15 @@ public class Broker extends Host {
         hostService = new HostService(logger);
     }
 
+    public Broker(String serverId) {
+        String[] parts = serverId.split(":");
+
+        if (parts.length == 2) {
+            address = parts[0];
+            port = Integer.parseInt(parts[1]);
+        }
+    }
+
     /**
      * Send replica data to the follower
      */

@@ -149,7 +149,7 @@ public class ProducerHandler {
     private boolean sendToFollowers(String key, byte[] data) {
         boolean isSuccess = true;
 
-        if (CacheManager.isLeader(key, new Host(connection.getSourceIPAddress(), connection.getSourcePort()))) {
+        if (CacheManager.isLeader(key, CacheManager.getBrokerInfo())) {
             Brokers brokers = CacheManager.getBrokers(key);
 
             if (brokers != null) {

@@ -1,8 +1,12 @@
 package controllers.heartbeat;
 
 import configurations.BrokerConstants;
+import controllers.database.CacheManager;
+import controllers.loadBalancer.LBHandler;
+import controllers.replication.Broker;
 import models.HeartBeatReceivedTime;
 import models.HeartBeatReceivedTimes;
+import utilities.BrokerPacketHandler;
 
 /**
  * Responsible for detecting whether the broker holding the particular partition crashed.
@@ -11,9 +15,11 @@ import models.HeartBeatReceivedTimes;
  */
 public class FailureDetector {
     private HeartBeatReceivedTimes heartBeatReceivedTimes;
+    private LBHandler lbHandler;
 
     public FailureDetector() {
         heartBeatReceivedTimes = new HeartBeatReceivedTimes();
+        lbHandler = new LBHandler();
     }
 
     /**
@@ -32,6 +38,31 @@ public class FailureDetector {
         }
 
         heartBeatReceivedTime.setTimespan(currentTime);
+    }
+
+    /**
+     * Marking the given broker as failed
+     */
+    public void markDown(String key, String serverId) {
+        Broker broker = CacheManager.getBroker(key, serverId);
+
+        //Remove the broker from the list of brokers handling the partition of the topic
+        CacheManager.removeBroker(key, broker);
+
+        //Set the status of the current broker as "waiting for new follower"
+        CacheManager.setStatus(key, BrokerConstants.BROKER_STATE.WAIT_FOR_NEW_FOLLOWER);
+
+        //Checking if the current broker is leader of the topic partition
+        if(CacheManager.isLeader(key, broker)) {
+            CacheManager.setLeaderAsInActive(key);
+            broker.setDesignation(BrokerConstants.BROKER_DESIGNATION.LEADER.getValue());
+        } else {
+            broker.setDesignation(BrokerConstants.BROKER_DESIGNATION.FOLLOWER.getValue());
+        }
+
+        //Letting load balancer know about it
+        byte[] packet = BrokerPacketHandler.createFailBrokerPacket(key, broker);
+        lbHandler.sendLeaderUpdate(packet);
     }
 
     /**
@@ -54,7 +85,7 @@ public class FailureDetector {
 
         if (timeSinceLastHeartBeat >= BrokerConstants.HEARTBEAT_TIMEOUT_THRESHOLD) {
             if (receivedTime.isMaxRetry()) {
-                //markDown(receivedTime.getKey(), receivedTime.getServerId());
+                markDown(receivedTime.getKey(), receivedTime.getServerId());
             } else {
                 receivedTime.incrementRetry();
             }

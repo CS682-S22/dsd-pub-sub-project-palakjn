@@ -150,11 +150,8 @@ public class LBHandler {
             if (file.initialize(String.format(BrokerConstants.TOPIC_LOCATION, connection.getSourceIPAddress(), connection.getSourcePort()), partition.getTopicName(), partition.getNumber())) {
                 CacheManager.addPartition(partition.getTopicName(), partition.getNumber(), file);
 
-                //Adding followers if the current broker is leader
-                Host host = new Host(connection.getSourceIPAddress(), connection.getSourcePort());
-                if (host.equals(partition.getLeader())) {
-                    CacheManager.setLeader(file.getName(), new Broker(partition.getLeader()));
-                }
+                //Adding leader information of the given topic
+                CacheManager.setLeader(file.getName(), new Broker(partition.getLeader()));
 
                 for (Host broker : partition.getBrokers()) {
                     CacheManager.addBroker(file.getName(), new Broker(broker));

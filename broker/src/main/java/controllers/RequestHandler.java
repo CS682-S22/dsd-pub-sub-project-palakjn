@@ -2,13 +2,20 @@ package controllers;
 
 import configurations.BrokerConstants;
 import controllers.consumer.ConsumerHandler;
+import controllers.database.CacheManager;
+import controllers.election.Election;
 import controllers.heartbeat.HeartBeatReceiver;
-import controllers.loadBalancer.LBHandler;
 import controllers.producer.ProducerHandler;
+import controllers.replication.Broker;
 import models.Header;
+import models.requests.BrokerUpdateRequest;
+import models.requests.Request;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import utilities.BrokerPacketHandler;
+import utilities.JSONDesrializer;
+
+import java.util.Objects;
 
 /**
  * Responsible for handling requests from other hosts.
@@ -49,8 +56,34 @@ public class RequestHandler {
                     running = false;
                 } else if (header.getRequester() == BrokerConstants.REQUESTER.BROKER.getValue()) {
                     if (header.getType() == BrokerConstants.TYPE.HEARTBEAT.getValue()) {
+                        //TODO: Log
                         HeartBeatReceiver heartBeatReceiver = new HeartBeatReceiver();
                         heartBeatReceiver.handleRequest(connection, request);
+                    } else if (header.getType() == BrokerConstants.TYPE.ELECTION.getValue()) {
+                        //TODO: Log
+                        hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER);
+                        Election election = new Election();
+                        election.handleRequest(request);
+                    } else if (header.getType() == BrokerConstants.TYPE.UPDATE.getValue()) {
+                        //TODO: Log
+                        byte[] data = BrokerPacketHandler.getData(request);
+
+                        if (data != null) {
+                            Request<BrokerUpdateRequest> brokerUpdateRequest = JSONDesrializer.fromJson(data, Request.class);
+
+                            if (brokerUpdateRequest != null && brokerUpdateRequest.getRequest() != null) {
+                                if (Objects.equals(brokerUpdateRequest.getType(), BrokerConstants.REQUEST_TYPE.LEADER)) {
+                                    //TODO: Log
+                                    CacheManager.setLeader(brokerUpdateRequest.getRequest().getTopic(), new Broker(brokerUpdateRequest.getRequest().getBroker()));
+                                    hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER);
+                                    CacheManager.setStatus(brokerUpdateRequest.getRequest().getTopic(), BrokerConstants.BROKER_STATE.SYNC);
+                                    //TODO: Call sync module
+                                } else {
+                                    //TODO: log
+                                }
+                            }
+                        }
+
                     }
                 }
             } else {
