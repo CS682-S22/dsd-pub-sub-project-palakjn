@@ -150,7 +150,7 @@ public class RequestHandler {
                     Host leader = CacheManager.getLeader(getBrokerRequest.getName(), getBrokerRequest.getPartition());
                     Response<Host> response;
 
-                    if (leader != null) {
+                    if (leader.isActive()) {
                         response = new Response<>(Constants.RESPONSE_STATUS.OK, leader);
                     } else {
                         response = new Response<>(Constants.RESPONSE_STATUS.SYN);

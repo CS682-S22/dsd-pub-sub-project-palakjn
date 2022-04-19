@@ -49,6 +49,19 @@ public class Brokers {
     }
 
     /**
+     * Get the number of brokers
+     */
+    public int getSize() {
+        lock.readLock().lock();
+
+        try {
+            return brokers.size();
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    /**
      * Get the broker
      */
     public Broker getBroker(Host host) {

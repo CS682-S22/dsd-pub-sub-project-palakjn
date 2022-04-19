@@ -1,6 +1,7 @@
 package controllers;
 
 import configurations.BrokerConstants;
+import controllers.database.CacheManager;
 import models.Host;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -68,6 +69,10 @@ public class Broker extends Host {
 
         if (connection != null) {
             isSuccess = hostService.sendPacketWithACK(connection, data, waitTime, retry);
+
+            if (isSuccess) {
+                logger.info(String.format("[%s:%d] Send %d bytes of data to the broker %s:%d.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), data.length, address, port));
+            }
         }
 
         return isSuccess;

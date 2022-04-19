@@ -6,9 +6,8 @@ import controllers.Connection;
 import controllers.HostService;
 import controllers.consumer.Subscriber;
 import controllers.database.CacheManager;
-import controllers.Brokers;
-import models.data.File;
 import models.Header;
+import models.data.File;
 import models.requests.Request;
 import models.requests.TopicReadWriteRequest;
 import org.apache.logging.log4j.LogManager;
@@ -90,30 +89,35 @@ public class ProducerHandler {
                 if (header != null) {
                     if (header.getType() == BrokerConstants.TYPE.DATA.getValue()) {
                         if (header.getSeqNum() == seqNum) {
-                            byte[] data = BrokerPacketHandler.getData(message);
+                            BrokerConstants.BROKER_STATE broker_state = CacheManager.getStatus(partition.getName());
 
-                            if (data != null) {
-                                partition.write(data);
-                                logger.info(String.format("[%s:%d] Received data %d from producer %s:%d. Written to the segment.", connection.getSourceIPAddress(), connection.getSourcePort(), seqNum, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                            if (broker_state == BrokerConstants.BROKER_STATE.READY) {
+                                byte[] data = BrokerPacketHandler.getData(message);
 
-                                //Sending to all the subscribers.
-                                sendToSubscribers(data);
+                                if (data != null) {
+                                    //Sending to all the subscribers.
+                                    sendToSubscribers(data);
 
-                                //Sending to all the followers if the current broker is the leader
-                                if (sendToFollowers(partition.getName(), data)) {
-                                    //Sending ACK to producer only once replicate data to the followers
-                                    hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
-                                    seqNum++;
+                                    //Sending to all the followers if the current broker is the leader
+                                    if (partition.write(data, CacheManager.isLeader(partition.getName(), CacheManager.getBrokerInfo()))) {
+                                        //Sending ACK to producer only once replicate data to the followers
+                                        hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                                        seqNum++;
+                                    }
+                                    logger.info(String.format("[%s:%d] Received data %d from producer %s:%d. Written to the segment.", connection.getSourceIPAddress(), connection.getSourcePort(), seqNum, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                                } else {
+                                    logger.warn(String.format("[%s:%d] Received empty data %d from producer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), seqNum, connection.getDestinationIPAddress(), connection.getDestinationPort()));
                                 }
                             } else {
-                                logger.warn(String.format("[%s:%d] Received empty data %d from producer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), seqNum, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                                logger.info(String.format("[%s:%d] Broker is in %s state. Not accepting new data from producer %s:%d. Sending NACK.", connection.getSourceIPAddress(), connection.getSourcePort(), broker_state.name(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                                hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                             }
                         } else if (header.getSeqNum() < seqNum) {
                             logger.warn(String.format("[%s:%d] Received data from producer %s:%d with the seqNum as %d. Expecting %d. Sending ACK.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getSeqNum(), seqNum));
                             hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                         } else {
                             logger.warn(String.format("[%s:%d] Received data from producer %s:%d with the seqNum as %d. Expecting %d. Ignoring the data.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getSeqNum(), seqNum));
-                         }
+                        }
                     } else if (header.getType() == BrokerConstants.TYPE.REQ.getValue()) {
                         logger.info(String.format("[%s:%d] Received REQ request from producer %s:%d again. Sending ACK as ACK might have lost before.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
                         hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
@@ -140,23 +144,5 @@ public class ProducerHandler {
             subscriber.onEvent(data);
             logger.info(String.format("[%s:%d] Send data to the subscriber: %s.", connection.getSourceIPAddress(), connection.getSourcePort(), subscriber.getAddress()));
         }
-    }
-
-    /**
-     * [Blocking call] Sending data to all the followers
-     */
-    private boolean sendToFollowers(String key, byte[] data) {
-        boolean isSuccess = true;
-
-        //TODO: Send inside partition
-        if (CacheManager.isLeader(key, CacheManager.getBrokerInfo())) {
-            Brokers brokers = CacheManager.getBrokers(key);
-
-            if (brokers != null) {
-                isSuccess = brokers.send(data, BrokerConstants.CHANNEL_TYPE.DATA, BrokerConstants.ACK_WAIT_TIME, true);
-            }
-        }
-
-        return isSuccess;
     }
 }

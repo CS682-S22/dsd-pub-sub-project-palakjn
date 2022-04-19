@@ -1,11 +1,13 @@
 package models.data;
 
 import configurations.BrokerConstants;
+import controllers.Brokers;
 import controllers.database.CacheManager;
 import controllers.database.FileManager;
 import models.sync.DataPacket;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import utilities.BrokerPacketHandler;
 
 import java.util.*;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -66,7 +68,8 @@ public class File {
      * Writes new data to the segment.
      * Flush the segment either after certain amount of time elapsed or the number of logs holding exceeded the MAX allowed number of logs.
      */
-    public void write(byte[] data) {
+    public boolean write(byte[] data, boolean sendToFollowers) {
+        boolean isSuccess = true;
         lock.writeLock().lock();
 
         if (segment.isEmpty()) {
@@ -96,7 +99,23 @@ public class File {
             timer.cancel();
         }
 
+        if (sendToFollowers) {
+            Brokers brokers = CacheManager.getBrokers(name);
+
+            if (brokers != null) {
+                data = BrokerPacketHandler.createDataPacket(name, BrokerConstants.DATA_TYPE.REPLICA_DATA, data);
+                isSuccess = brokers.send(data, BrokerConstants.CHANNEL_TYPE.DATA, BrokerConstants.ACK_WAIT_TIME, true);
+
+                if (isSuccess) {
+                    logger.info(String.format("[%s:%d] Send the data to %d number of followers successfully.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), brokers.getSize()));
+                } else {
+                    logger.info(String.format("[%s:%d] Fail to send the data to one or more number of %d followers.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), brokers.getSize()));
+                }
+            }
+        }
+
         lock.writeLock().unlock();
+        return isSuccess;
     }
 
     /**
@@ -105,24 +124,30 @@ public class File {
     public boolean write(DataPacket dataPacket) {
         boolean isWritten = true;
         lock.writeLock().lock();
-        //TODO: put logs
+
         BrokerConstants.BROKER_STATE broker_state = CacheManager.getStatus(dataPacket.getKey());
 
         if (broker_state == BrokerConstants.BROKER_STATE.READY) {
             if (Objects.equals(dataPacket.getDataType(), BrokerConstants.DATA_TYPE.REPLICA_DATA)) {
-                write(dataPacket.getData());
+                logger.info(String.format("[%s:%d] Writing REPLICA data to segment for key %s", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), name));
+                write(dataPacket.getData(), false);
             } else {
+                logger.warn(String.format("[%s:%d] Not writing data to segment as received %s request type when the broker is in READY state for key %s.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), dataPacket.getDataType(), name));
                 isWritten = false;
             }
         } else if (broker_state == BrokerConstants.BROKER_STATE.SYNC) {
             if (Objects.equals(dataPacket.getDataType(), BrokerConstants.DATA_TYPE.REPLICA_DATA)) {
+                logger.info(String.format("[%s:%d] Writing the REPLICA data to local buffer as the broker state is SYNC for key %s.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), name));
                 writeToLocal(dataPacket.getData());
             } else if (Objects.equals(dataPacket.getDataType(), BrokerConstants.DATA_TYPE.CATCH_UP_DATA)) {
-                write(dataPacket.getData());
+                logger.info(String.format("[%s:%d] Writing the CATCH-UP data to segment as the broker state is SYNC for key %s.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), name));
+                write(dataPacket.getData(), false);
             } else {
+                logger.warn(String.format("[%s:%d] Not writing data to segment as received %s request type when the broker is in SYNC state for key %s.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), dataPacket.getDataType(), name));
                 isWritten = false;
             }
         } else {
+            logger.warn(String.format("[%s:%d] Not writing data to segment when the broker is in %s state for key %s.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), broker_state.name(), name));
             isWritten = false;
         }
 
@@ -152,7 +177,7 @@ public class File {
 
         if (buffer != null) {
             for (byte[] data : buffer) {
-                write(data);
+                write(data, false);
             }
 
             buffer = null;

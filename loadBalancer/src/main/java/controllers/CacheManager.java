@@ -91,9 +91,8 @@ public class CacheManager {
 
                 if (broker != null) {
                     broker.incrementNumOfPartitions();
+                    brokersWithLessLoad.add(new Host(broker));
                 }
-
-                brokersWithLessLoad.add(new Host(broker));
             }
         }
 

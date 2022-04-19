@@ -129,4 +129,13 @@ public class BrokerPacketHandler extends PacketHandler {
 
         return createPacket(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.DATA, dataPacket);
     }
+
+    /**
+     * Create the packet to contain the data packet to send to broker
+     */
+    public static byte[] createDataPacket(String key, String type, byte[] data) {
+        DataPacket dataPacket = new DataPacket(key, type, data);
+
+        return createPacket(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.DATA, dataPacket);
+    }
 }

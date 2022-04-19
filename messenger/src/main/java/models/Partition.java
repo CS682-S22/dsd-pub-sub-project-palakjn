@@ -104,10 +104,10 @@ public class Partition extends Object {
     }
 
     /**
-     * Remove Leader
+     * Set leader of the partition as inactive
      */
     public void removeLeader() {
-        leader = null;
+        leader.setInActive();
         brokers.removeIf(broker -> broker.getDesignation() == Constants.BROKER_DESIGNATION.LEADER.getValue());
     }
 

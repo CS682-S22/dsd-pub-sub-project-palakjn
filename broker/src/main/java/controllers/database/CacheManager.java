@@ -317,7 +317,7 @@ public class CacheManager {
     /**
      * Remove the broker
      */
-    public static void removeBroker(String key, Broker broker) {
+    public static void removeBroker(String key, Host broker) {
         brokerLock.writeLock().lock();
 
         if (brokers.containsKey(key)) {

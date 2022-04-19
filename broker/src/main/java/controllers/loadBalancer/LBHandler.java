@@ -9,6 +9,7 @@ import controllers.database.CacheManager;
 import controllers.election.Election;
 import controllers.heartbeat.HeartBeatSender;
 import controllers.Broker;
+import controllers.replication.SyncManager;
 import models.*;
 import models.data.File;
 import models.heartbeat.HeartBeatRequest;
@@ -30,11 +31,13 @@ public class LBHandler {
     private Connection connection;
     private HeartBeatSender heartBeatSender;
     private Election election;
+    private SyncManager syncManager;
 
     public LBHandler() {
         hostService = new HostService(logger);
         heartBeatSender = new HeartBeatSender();
         election = new Election();
+        syncManager = new SyncManager();
     }
 
     /**
@@ -183,14 +186,13 @@ public class LBHandler {
                     CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.READY);
                 } else {
                     //If the current broker is follower of the topic then,
-                    if (partition.getLeader() == null || !partition.getLeader().isActive()) {
-                        // If the leader for the given partition is null then, start the election
+                    if (!partition.getLeader().isActive()) {
+                        // If the leader for the given partition is not active then, start the election
                         CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.ELECTION);
-                        election.start(partition.getString());
+                        election.start(partition.getString(), partition.getLeader());
                     } else {
                         // If the leader is active then, changing the status to SYNC mode and starting catching up with leader
-                        CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.SYNC);
-                        //TODO: Call sync mode
+                        syncManager.sync(partition.getString());
                     }
                 }
 
@@ -216,10 +218,10 @@ public class LBHandler {
                     heartBeatSender.send(heartBeatRequest);
                 }
 
-                if (partition.getLeader() == null || !partition.getLeader().isActive()) {
-                    // If the leader for the given partition is null then, start the election
+                if (!partition.getLeader().isActive()) {
+                    // If the leader for the given partition is not active then, start the election
                     CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.ELECTION);
-                    election.start(partition.getString());
+                    election.start(partition.getString(), partition.getLeader());
                 } else {
                     //If new follower is added, then keep the status of current broker for the partition as READY
                     CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.READY);

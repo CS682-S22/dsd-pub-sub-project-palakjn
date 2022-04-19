@@ -15,19 +15,22 @@ public class BrokerUpdateRequest {
     @Expose
     private int partition;
     @Expose
+    private String key;
+    @Expose
     private Host broker;
-
-    public BrokerUpdateRequest(String topic, int partition, Host broker) {
-        this.topic = topic;
-        this.partition = partition;
-        this.broker = broker;
-    }
 
     public BrokerUpdateRequest(String key, Host broker) {
         String[] parts = key.split(":");
         this.topic = parts[0];
         this.partition = Integer.parseInt(parts[1]);
         this.broker = broker;
+    }
+
+    /**
+     * Get the partition key
+     */
+    public String getKey() {
+        return key;
     }
 
     /**

@@ -3,6 +3,7 @@ package framework;
 import configuration.Constants;
 import controllers.Client;
 import models.Header;
+import models.Host;
 import models.Properties;
 import org.apache.logging.log4j.LogManager;
 import utilities.PacketHandler;
@@ -62,7 +63,7 @@ public class Producer extends Client {
                 if (data != null) {
                     byte[] dataPacket = PacketHandler.createDataPacket(Constants.REQUESTER.PRODUCER, data, seqNum);
 
-                    while (running) {
+                    while (running && connection.isOpen()) {
                         connection.send(dataPacket);
                         connection.setTimer(Constants.ACK_WAIT_TIME);
                         //Waiting for an acknowledgment
@@ -74,10 +75,15 @@ public class Producer extends Client {
 
                             if (header.getType() == Constants.TYPE.ACK.getValue() && header.getSeqNum() == seqNum) {
                                 //Received ACK of the packet
-                                logger.warn(String.format("[%s:%d] [%s] Send %d number of bytes to the broker with the seq num %d.", broker.getAddress(), broker.getPort(), hostName, data.length, seqNum));
+                                logger.info(String.format("[%s:%d] [%s] Send %d number of bytes to the broker with the seq num %d.", broker.getAddress(), broker.getPort(), hostName, data.length, seqNum));
                                 seqNum++;
                                 running = false;
                                 retry = false;
+                            } else if (header.getType() == Constants.TYPE.NACK.getValue() && header.getSeqNum() == seqNum) {
+                                //Received NACK response for the packet
+                                logger.info(String.format("[%s:%d] [%s] Received NACK response from the broker for the packet with %d with sequence number. Sleeping for %d time before retrying", broker.getAddress(), broker.getPort(), hostName, seqNum, Constants.PRODUCER_SLEEP_TIME));
+                                Thread.sleep(Constants.PRODUCER_SLEEP_TIME);
+                                retry = true;
                             } else {
                                 logger.warn(String.format("[%s:%d] [%s] Received invalid response %s from the broker with the seqNum as %d. Expecting seqNum: %d. Retrying", broker.getAddress(), broker.getPort(), hostName, header.getType(), header.getSeqNum(), seqNum));
                                 retry = true;
@@ -91,7 +97,16 @@ public class Producer extends Client {
                         if (retry) {
                             connection.resetTimer();
 
-                            getBrokerAndConnect(topic, key);
+                            Host oldBroker = new Host(broker);
+                            if (getBrokerAndConnect(topic, key)) {
+                                if (!oldBroker.equals(broker)) {
+                                    logger.info(String.format("[%s] Received new leader information from broker. Reset sequence number to 0", hostName));
+                                    seqNum = 0;
+                                }
+                            } else {
+                                logger.warn(String.format("[%s] Fail to get broker info from load balancer or during connection establishment with broker. Not retrying", hostName));
+                                running = false;
+                            }
                         }
                     }
                 }

@@ -98,9 +98,7 @@ public class Client {
                                     byte[] body = PacketHandler.getData(responseBytes);
 
                                     if (body != null) {
-                                        running = false;
-
-                                        Response<Host> response = JSONDesrializer.fromJson(body, Response.class);
+                                        Response<Host> response = JSONDesrializer.deserializeResponse(body, Host.class);
 
                                         if (response != null && response.isValid()) {
                                             if (response.isInSync()) {
@@ -110,6 +108,7 @@ public class Client {
                                                 timer.startTimer(Constants.TYPE.REQ.name(), Constants.ACK_WAIT_TIME);
                                             } else if (response.isOk()) {
                                                 broker = response.getObject();
+                                                running = false;
                                             } else {
                                                 logger.warn(String.format("[%s] [%s:%d] Received response with invalid status %s from the load balancer. Retrying.", hostName, connection.getDestinationIPAddress(), connection.getDestinationPort(), response.getStatus()));
                                                 connection.send(packet);
@@ -135,6 +134,8 @@ public class Client {
                     }
                 }
             }
+
+            connection.closeConnection();
         } catch (IOException exception) {
             logger.error(String.format("[%s:%d] Fail to get broker information from load balancer.", loadBalancer.getAddress(), loadBalancer.getPort()), exception.getMessage());
         } catch (InterruptedException e) {

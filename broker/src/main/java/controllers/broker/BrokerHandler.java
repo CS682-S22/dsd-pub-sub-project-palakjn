@@ -5,9 +5,11 @@ import controllers.*;
 import controllers.database.CacheManager;
 import controllers.election.Election;
 import controllers.heartbeat.HeartBeatReceiver;
+import controllers.heartbeat.HeartBeatSender;
 import controllers.replication.SyncManager;
 import models.Header;
 import models.data.File;
+import models.heartbeat.HeartBeatRequest;
 import models.requests.BrokerUpdateRequest;
 import models.requests.Request;
 import models.requests.TopicReadWriteRequest;
@@ -32,12 +34,14 @@ public class BrokerHandler {
     private HostService hostService;
     private SyncManager syncManager;
     private DataTransfer dataTransfer;
+    private HeartBeatSender heartBeatSender;
 
     public BrokerHandler(Connection connection) {
         this.connection = connection;
         hostService = new HostService(logger);
         syncManager = new SyncManager();
         dataTransfer = new DataTransfer(connection);
+        heartBeatSender = new HeartBeatSender();
     }
 
     /**
@@ -51,6 +55,7 @@ public class BrokerHandler {
         } else if (header.getType() == BrokerConstants.TYPE.ELECTION.getValue()) {
             //TODO: Log
             hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER);
+
             Election election = new Election();
             election.handleRequest(message);
         } else if (header.getType() == BrokerConstants.TYPE.UPDATE.getValue()) {
@@ -80,11 +85,14 @@ public class BrokerHandler {
             if (brokerUpdateRequest != null && brokerUpdateRequest.getRequest() != null) {
                 if (Objects.equals(brokerUpdateRequest.getType(), BrokerConstants.REQUEST_TYPE.LEADER)) {
                     //TODO: Log
-                    CacheManager.setLeader(brokerUpdateRequest.getRequest().getTopic(), new Broker(brokerUpdateRequest.getRequest().getBroker()));
+                    CacheManager.setLeader(brokerUpdateRequest.getRequest().getKey(), new Broker(brokerUpdateRequest.getRequest().getBroker()));
                     hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER);
 
-                    //TODO: Send a heartbeat message to new leader
-                    syncManager.sync(brokerUpdateRequest.getRequest().getTopic());
+                    //Start sending heartbeat messages to another brokers
+                    //TODO: log
+                    HeartBeatRequest heartBeatRequest = new HeartBeatRequest(brokerUpdateRequest.getRequest().getKey(), CacheManager.getBrokerInfo().getString(), brokerUpdateRequest.getRequest().getBroker().getString());
+                    heartBeatSender.send(heartBeatRequest);
+                    syncManager.sync(brokerUpdateRequest.getRequest().getKey());
                 } else {
                     //TODO: log
                 }
