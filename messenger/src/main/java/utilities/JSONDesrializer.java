@@ -2,10 +2,14 @@ package utilities;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
+import com.google.gson.reflect.TypeToken;
+import models.requests.Request;
+import models.responses.Response;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.Reader;
+import java.lang.reflect.Type;
 
 /**
  * Responsible for serializing JSON string to object
@@ -29,6 +33,52 @@ public class JSONDesrializer {
         try {
             String json = new String(body);
             object = gson.fromJson(json, classOfT);
+        }
+        catch (JsonSyntaxException exception) {
+            logger.error("Unable to parse json", exception);
+        }
+
+        return object;
+    }
+
+    /**
+     * Parse the body to get the request of class T
+     * @param body JSON String in bytes
+     * @param classOfT Type of Class
+     * @return Parsed object
+     */
+    public static <T> Request<T> deserializeRequest(byte[] body, Class<T> classOfT) {
+        Gson gson = new Gson();
+
+        Request<T> object = null;
+        Type collectionType = new TypeToken<Request<T>>(){}.getType();
+
+        try {
+            String json = new String(body);
+            object = gson.fromJson(json, collectionType);
+        }
+        catch (JsonSyntaxException exception) {
+            logger.error("Unable to parse json", exception);
+        }
+
+        return object;
+    }
+
+    /**
+     * Parse the body to get the response of class T
+     * @param body JSON String in bytes
+     * @param classOfT Type of Class
+     * @return Parsed object
+     */
+    public static <T> Response<T> deserializeResponse(byte[] body, Class<T> classOfT) {
+        Gson gson = new Gson();
+
+        Response<T> object = null;
+        Type collectionType = new TypeToken<Response<T>>(){}.getType();
+
+        try {
+            String json = new String(body);
+            object = gson.fromJson(json, collectionType);
         }
         catch (JsonSyntaxException exception) {
             logger.error("Unable to parse json", exception);

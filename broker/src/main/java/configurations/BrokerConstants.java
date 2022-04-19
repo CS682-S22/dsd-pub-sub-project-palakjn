@@ -29,4 +29,9 @@ public class BrokerConstants extends Constants {
         HIGH,
         LESS
     }
+
+    public static class DATA_TYPE {
+        public static String CATCH_UP_DATA = "Catch up data";
+        public static String REPLICA_DATA = "Replica data";
+    }
 }

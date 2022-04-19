@@ -6,10 +6,9 @@ import controllers.Connection;
 import controllers.HostService;
 import controllers.consumer.Subscriber;
 import controllers.database.CacheManager;
-import controllers.replication.Brokers;
-import models.File;
+import controllers.Brokers;
+import models.data.File;
 import models.Header;
-import models.Host;
 import models.requests.Request;
 import models.requests.TopicReadWriteRequest;
 import org.apache.logging.log4j.LogManager;
@@ -40,7 +39,7 @@ public class ProducerHandler {
             byte[] body = BrokerPacketHandler.getData(message);
 
             if (body != null) {
-                Request<TopicReadWriteRequest> request = JSONDesrializer.fromJson(body, Request.class);
+                Request<TopicReadWriteRequest> request = JSONDesrializer.deserializeRequest(body, TopicReadWriteRequest.class);
                 TopicReadWriteRequest writeTopicRequest = null;
 
                 if (request != null) {
@@ -149,6 +148,7 @@ public class ProducerHandler {
     private boolean sendToFollowers(String key, byte[] data) {
         boolean isSuccess = true;
 
+        //TODO: Send inside partition
         if (CacheManager.isLeader(key, CacheManager.getBrokerInfo())) {
             Brokers brokers = CacheManager.getBrokers(key);
 

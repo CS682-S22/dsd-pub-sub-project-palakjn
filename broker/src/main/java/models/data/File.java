@@ -1,14 +1,13 @@
-package models;
+package models.data;
 
 import configurations.BrokerConstants;
+import controllers.database.CacheManager;
 import controllers.database.FileManager;
+import models.sync.DataPacket;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
@@ -23,12 +22,14 @@ public class File {
     private FileManager fileManager;
     private String parentLocation;
     private Segment segment;
-    private int totalSize;           //Total size of messages received for the partition
+    private int totalSize;            //Total size of messages received for the partition
     private int segmentsToRead;       //Total number of segments available to read
-    private int availableSize;
+    private int availableSize;        //Size of the messages which are available to read
+    private int offset;               //Offset of the last message received
     private Timer timer;
     private volatile boolean isFlushed;
     private ReentrantReadWriteLock lock;
+    private List<byte[]> buffer;
 
     public File(String topicName, int partition) {
         name = String.format("%s:%d", topicName, partition);
@@ -52,6 +53,13 @@ public class File {
      */
     public String getName() {
         return name;
+    }
+
+    /**
+     * Get the expected offset of next log
+     */
+    public int getTotalSize() {
+        return totalSize;
     }
 
     /**
@@ -80,6 +88,7 @@ public class File {
 
         segment.write(data);
         segment.addOffset(totalSize);
+        offset = totalSize;
         totalSize += data.length;
 
         if (segment.getNumOfLogs() == BrokerConstants.MAX_SEGMENT_MESSAGES) {
@@ -91,9 +100,84 @@ public class File {
     }
 
     /**
+     * Write the data received from another broker to local segment based on the current broker status for the partition
+     */
+    public boolean write(DataPacket dataPacket) {
+        boolean isWritten = true;
+        lock.writeLock().lock();
+        //TODO: put logs
+        BrokerConstants.BROKER_STATE broker_state = CacheManager.getStatus(dataPacket.getKey());
+
+        if (broker_state == BrokerConstants.BROKER_STATE.READY) {
+            if (Objects.equals(dataPacket.getDataType(), BrokerConstants.DATA_TYPE.REPLICA_DATA)) {
+                write(dataPacket.getData());
+            } else {
+                isWritten = false;
+            }
+        } else if (broker_state == BrokerConstants.BROKER_STATE.SYNC) {
+            if (Objects.equals(dataPacket.getDataType(), BrokerConstants.DATA_TYPE.REPLICA_DATA)) {
+                writeToLocal(dataPacket.getData());
+            } else if (Objects.equals(dataPacket.getDataType(), BrokerConstants.DATA_TYPE.CATCH_UP_DATA)) {
+                write(dataPacket.getData());
+            } else {
+                isWritten = false;
+            }
+        } else {
+            isWritten = false;
+        }
+
+        lock.writeLock().unlock();
+        return isWritten;
+    }
+
+    /**
+     * Write the data to local buffer
+     */
+    private void writeToLocal(byte[] data) {
+        lock.writeLock().lock();
+
+        if (buffer == null) {
+            buffer = new ArrayList<>();
+        }
+
+        buffer.add(data);
+        lock.writeLock().unlock();
+    }
+
+    /**
+     * Flush the local buffer content to the storage
+     */
+    public void flushToSegment() {
+        lock.writeLock().lock();
+
+        if (buffer != null) {
+            for (byte[] data : buffer) {
+                write(data);
+            }
+
+            buffer = null;
+        }
+
+        lock.writeLock().unlock();
+    }
+
+    /**
+     * Get the offset of the last message received for the partition
+     */
+    public int getOffset() {
+        lock.readLock().lock();
+
+        try {
+            return offset;
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    /**
      * Getting the segment number which is holding the offset
      */
-    public int getSegmentNumber(int offset) {
+    public int getSegmentNumber(int offset, boolean isSync) {
         lock.readLock().lock();
         int segmentNumber = -1;
 
@@ -104,6 +188,8 @@ public class File {
                     break;
                 }
             }
+        } else if (isSync && offset < segment.getAvailableSize() && segment.isOffsetExist(segmentNumber)) {
+            segmentNumber = segment.getSegment();
         }
 
         lock.readLock().unlock();
@@ -111,22 +197,25 @@ public class File {
     }
 
     /**
-     * Getting the offset which is less than the given the offset.
+     * If ciel is false then get the offset which is less than or equal to the given offset
+     * If ciel is true then get the offset which is more than or equal to the given offset
      */
-    public int getRoundUpOffset(int offset) {
+    public int getRoundUpOffset(int offset, boolean isSync, boolean ciel) {
         lock.readLock().lock();
         int roundUpOffset = -1;
 
         if (offset < availableSize) {
             for (Segment segment : segments) {
                 if (offset < segment.getAvailableSize()) {
-                    roundUpOffset = segment.getRoundUpOffset(offset);
+                    roundUpOffset = segment.getRoundUpOffset(offset, ciel);
 
                     if (roundUpOffset != -1) {
                         break;
                     }
                 }
             }
+        } else if (isSync && offset < segment.getAvailableSize()) {
+            roundUpOffset = segment.getRoundUpOffset(offset, ciel);
         }
 
         lock.readLock().unlock();
@@ -134,18 +223,39 @@ public class File {
     }
 
     /**
-     * Get all the available segment from the given number
+     * Get all the available segment within the given range
      */
-    public List<Segment> getSegmentsFrom(int segmentNumber) {
+    public List<Segment> getSegmentsFrom(int from, int to) {
         List<Segment> segments = new ArrayList<>();
         lock.readLock().lock();
 
-        for (int i = segmentNumber; i < this.segments.size(); i++) {
-            segments.add(this.segments.get(i));
+        if (to < this.segments.size()) {
+            for (int i = from; i < to; i++) {
+                segments.add(this.segments.get(i));
+            }
+        } else if (to == this.segments.size()){
+            for (int i = from; i < this.segments.size(); i++) {
+                segments.add(this.segments.get(i));
+            }
+
+            segments.add(new Segment(segment));
         }
 
         lock.readLock().unlock();
         return segments;
+    }
+
+    /**
+     * Get the total number of segments to read from
+     */
+    public int getSegmentsToRead() {
+        lock.readLock().lock();
+
+        try {
+            return segmentsToRead;
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 
     /**

@@ -4,7 +4,7 @@ import configurations.BrokerConstants;
 import controllers.Connection;
 import controllers.HostService;
 import controllers.Channels;
-import models.HeartBeatRequest;
+import models.heartbeat.HeartBeatRequest;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 

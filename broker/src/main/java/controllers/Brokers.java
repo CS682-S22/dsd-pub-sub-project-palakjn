@@ -1,6 +1,7 @@
-package controllers.replication;
+package controllers;
 
 import configurations.BrokerConstants;
+import controllers.Broker;
 import models.Host;
 
 import java.util.ArrayList;
@@ -101,6 +102,36 @@ public class Brokers {
         for (Broker broker : brokers) {
             if ((priority_choice == BrokerConstants.PRIORITY_CHOICE.HIGH && broker.getPriorityNum() > priorityNum) ||
                     (priority_choice == BrokerConstants.PRIORITY_CHOICE.LESS && broker.getPriorityNum() < priorityNum)) {
+                collection.add(broker);
+            }
+        }
+
+        lock.readLock().unlock();
+        return collection;
+    }
+
+    /**
+     * Get the list of brokers
+     */
+    public List<Broker> getBrokers() {
+        lock.readLock().lock();
+
+        try {
+            return brokers;
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Get the list of brokers which has outOfSync data
+     */
+    public List<Broker> getOutOfSyncBrokers() {
+        List<Broker> collection = new ArrayList<>();
+        lock.readLock().lock();
+
+        for (Broker broker : brokers) {
+            if (broker.isOutOfSync()) {
                 collection.add(broker);
             }
         }

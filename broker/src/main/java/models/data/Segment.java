@@ -1,4 +1,4 @@
-package models;
+package models.data;
 
 import controllers.database.FileManager;
 
@@ -19,6 +19,7 @@ public class Segment {
     private int numOfLogs;
     private FileManager fileManager;
     private int availableSize; //Will hold size of the current segment + sum of the size of previous segments
+    private boolean isFlushed;
 
     public Segment(String parentLocation, int segment, int availableSize) {
         this.segment = segment;
@@ -26,6 +27,27 @@ public class Segment {
         this.location = String.format("%s/%d.log", parentLocation, segment);
         this.fileManager = new FileManager();
         this.availableSize = availableSize;
+    }
+
+    public Segment(Segment segment) {
+        this.segment = segment.getSegment();
+        this.buffer = segment.getBuffer();
+        this.offsets = segment.offsets;
+        this.location = segment.getLocation();
+        this.numOfLogs = segment.getNumOfLogs();
+        this.fileManager = segment.fileManager;;
+        this.availableSize = segment.getAvailableSize();
+    }
+
+    /**
+     * Get the log from the buffer from the given offset of given length
+     */
+    public byte[] getLog(int offset, int length) {
+        byte[] data = new byte[length];
+
+        System.arraycopy(buffer, offset, data, 0, length);
+
+        return data;
     }
 
     /**
@@ -50,17 +72,21 @@ public class Segment {
     }
 
     /**
-     * Get the offset which is less than or equal to the given offset
+     * If ciel is false then get the offset which is less than or equal to the given offset
+     * If ciel is true then get the offset which is more than or equal to the given offset
      */
-    public int getRoundUpOffset(int initialOffset) {
+    public int getRoundUpOffset(int initialOffset, boolean ciel) {
         int roundUpOffset = -1;
 
         for (int offset : offsets) {
-            if (initialOffset >= offset) {
-                roundUpOffset = offset;
-            } else {
+            if (!ciel && initialOffset < offset) {
                 break;
+            } else if (ciel && initialOffset > offset) {
+                roundUpOffset = offset;
+                continue;
             }
+
+            roundUpOffset = offset;
         }
 
         return roundUpOffset;
@@ -114,8 +140,16 @@ public class Segment {
 
         isSuccess = fileManager.write(buffer, location);
         buffer = null;
+        isFlushed = true;
 
         return isSuccess;
+    }
+
+    /**
+     * Determines if the segment is flushed
+     */
+    public boolean isFlushed() {
+        return isFlushed;
     }
 
     /**

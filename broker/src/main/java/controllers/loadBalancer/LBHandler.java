@@ -8,8 +8,10 @@ import controllers.HostService;
 import controllers.database.CacheManager;
 import controllers.election.Election;
 import controllers.heartbeat.HeartBeatSender;
-import controllers.replication.Broker;
+import controllers.Broker;
 import models.*;
+import models.data.File;
+import models.heartbeat.HeartBeatRequest;
 import models.requests.Request;
 import models.responses.Response;
 import org.apache.logging.log4j.LogManager;
@@ -76,7 +78,7 @@ public class LBHandler {
             byte[] body = BrokerPacketHandler.getData(packet);
 
             if (body != null) {
-                Request<Topic> topicRequest = JSONDesrializer.fromJson(body, Request.class);
+                Request<Topic> topicRequest = JSONDesrializer.deserializeRequest(body, Topic.class);
                 Topic topic = null;
 
                 if (topicRequest != null) {
@@ -301,7 +303,7 @@ public class LBHandler {
         byte[] body = BrokerPacketHandler.getData(responseBytes);
 
         if (body != null) {
-            Response<JoinResponse> joinResponse = JSONDesrializer.fromJson(body, Response.class);
+            Response<JoinResponse> joinResponse = JSONDesrializer.deserializeResponse(body, JoinResponse.class);
 
             if (joinResponse != null && joinResponse.isValid() && joinResponse.isOk()) {
                 CacheManager.setPriorityNum(joinResponse.getObject().getPriorityNum());

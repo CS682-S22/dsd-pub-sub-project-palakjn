@@ -1,4 +1,6 @@
-package models;
+package models.heartbeat;
+
+import models.heartbeat.HeartBeatReceivedTime;
 
 import java.util.ArrayList;
 import java.util.List;

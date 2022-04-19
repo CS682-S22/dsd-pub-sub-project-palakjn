@@ -120,7 +120,8 @@ public class Constants {
 
     public enum METHOD {
         PULL(0),
-        PUSH(1);
+        PUSH(1),
+        SYNC(2);
 
         private final int value;
         METHOD(int value) {
@@ -145,10 +146,12 @@ public class Constants {
 
     public static class REQUEST_TYPE {
         public static String ADD = "ADD";
+        public static String GET = "GET";
         public static String REM = "REMOVE";
         public static String FAIL = "FAIL";
         public static String LEADER = "NEW LEADER";
         public static String ELECTION = "ELECTION";
+        public static String OFFSET = "OFFSET";
     }
 
     public enum BROKER_DESIGNATION {

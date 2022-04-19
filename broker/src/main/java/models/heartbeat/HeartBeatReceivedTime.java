@@ -1,4 +1,4 @@
-package models;
+package models.heartbeat;
 
 import configurations.BrokerConstants;
 

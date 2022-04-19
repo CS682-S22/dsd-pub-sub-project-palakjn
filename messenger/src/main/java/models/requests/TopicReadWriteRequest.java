@@ -14,15 +14,23 @@ public class TopicReadWriteRequest {
     @Expose
     private int partition;
     @Expose
-    private int offset;
+    private int fromOffset;
     @Expose
     private int numOfMsg;
+    @Expose
+    private int toOffset;
 
     public TopicReadWriteRequest(String name, int partition, int offset, int numOfMsg) {
         this.name = name;
         this.partition = partition;
-        this.offset = offset;
+        this.fromOffset = offset;
         this.numOfMsg = numOfMsg;
+    }
+
+    public TopicReadWriteRequest(String name, int partition, int offset) {
+        this.name = name;
+        this.partition = partition;
+        this.fromOffset = offset;
     }
 
     /**
@@ -40,17 +48,17 @@ public class TopicReadWriteRequest {
     }
 
     /**
-     * Get the offset
+     * Get the offset to read from
      */
-    public int getOffset() {
-        return offset;
+    public int getFromOffset() {
+        return fromOffset;
     }
 
     /**
-     * Set the offset
+     * Set the offset to read from
      */
-    public void setOffset(int offset) {
-        this.offset = offset;
+    public void setFromOffset(int offset) {
+        this.fromOffset = offset;
     }
 
     /**
@@ -65,5 +73,19 @@ public class TopicReadWriteRequest {
      */
     public boolean isValid() {
         return !Strings.isNullOrEmpty(name);
+    }
+
+    /**
+     * Get the offset to read till
+     */
+    public int getToOffset() {
+        return toOffset;
+    }
+
+    /**
+     * Set the offset to read till
+     */
+    public void setToOffset(int lastOffset) {
+        this.toOffset = lastOffset;
     }
 }

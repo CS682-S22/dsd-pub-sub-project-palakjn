@@ -4,9 +4,9 @@ import configurations.BrokerConstants;
 import controllers.Channels;
 import controllers.database.CacheManager;
 import controllers.loadBalancer.LBHandler;
-import controllers.replication.Broker;
-import models.HeartBeatReceivedTime;
-import models.HeartBeatReceivedTimes;
+import controllers.Broker;
+import models.heartbeat.HeartBeatReceivedTime;
+import models.heartbeat.HeartBeatReceivedTimes;
 import utilities.BrokerPacketHandler;
 
 /**

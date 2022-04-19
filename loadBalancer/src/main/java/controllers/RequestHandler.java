@@ -72,7 +72,7 @@ public class RequestHandler {
 
         if (body != null) {
             if (type.equals(Constants.TYPE.REQ.name())) {
-                Request<Host> request = JSONDesrializer.fromJson(body, Request.class);
+                Request<Host> request = JSONDesrializer.deserializeRequest(body, Host.class);
 
                 if (request != null) {
                     Host broker = request.getRequest();
@@ -104,7 +104,7 @@ public class RequestHandler {
                     }
                 }
             } else if (type.equals(Constants.TYPE.UPDATE.name())) {
-                Request<BrokerUpdateRequest> request = JSONDesrializer.fromJson(body, Request.class);
+                Request<BrokerUpdateRequest> request = JSONDesrializer.deserializeRequest(body, BrokerUpdateRequest.class);
 
                 if (request != null) {
                     BrokerUpdateRequest brokerUpdateRequest = request.getRequest();
@@ -136,7 +136,7 @@ public class RequestHandler {
         byte[] responseBytes = null;
 
         if (body != null) {
-            Request<GetBrokerRequest> request = JSONDesrializer.fromJson(body, Request.class);
+            Request<GetBrokerRequest> request = JSONDesrializer.deserializeRequest(body, GetBrokerRequest.class);
             GetBrokerRequest getBrokerRequest = null;
 
             if (request != null) {
@@ -180,7 +180,7 @@ public class RequestHandler {
         byte[] body = LBPacketHandler.getData(message);
 
         if (body != null) {
-            Request<CreateTopicRequest> request = JSONDesrializer.fromJson(body, Request.class);
+            Request<CreateTopicRequest> request = JSONDesrializer.deserializeRequest(body, CreateTopicRequest.class);
             CreateTopicRequest topicRequest = null;
 
             if (request != null && request.getRequest() != null) {

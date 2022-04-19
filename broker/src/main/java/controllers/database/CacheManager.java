@@ -2,9 +2,9 @@ package controllers.database;
 
 import configurations.BrokerConstants;
 import controllers.consumer.Subscriber;
-import controllers.replication.Broker;
-import controllers.replication.Brokers;
-import models.File;
+import controllers.Broker;
+import controllers.Brokers;
+import models.data.File;
 import models.Host;
 
 import java.util.ArrayList;
@@ -93,14 +93,14 @@ public class CacheManager {
     /**
      * Get the state mode of the broker which is holding the particular key
      */
-    public static BrokerConstants.BROKER_STATE getStatus(String key) {
+    public static synchronized BrokerConstants.BROKER_STATE getStatus(String key) {
         return brokerStatus.getOrDefault(key, BrokerConstants.BROKER_STATE.NONE);
     }
 
     /**
      * Set the state mode of the broker
      */
-    public static void setStatus(String key, BrokerConstants.BROKER_STATE state) {
+    public static synchronized void setStatus(String key, BrokerConstants.BROKER_STATE state) {
         brokerStatus.put(key, state);
     }
 
@@ -160,6 +160,19 @@ public class CacheManager {
 
         try {
             return partitions.getOrDefault(getKey(topic, partition), null);
+        } finally {
+            topicLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Get the file holding given partition of the topic information
+     */
+    public static File getPartition(String key) {
+        topicLock.readLock().lock();
+
+        try {
+            return partitions.getOrDefault(key, null);
         } finally {
             topicLock.readLock().unlock();
         }

@@ -2,11 +2,16 @@ package utilities;
 
 import configuration.Constants;
 import configurations.BrokerConstants;
-import models.ElectionRequest;
-import models.HeartBeatRequest;
 import models.Host;
+import models.election.ElectionRequest;
+import models.heartbeat.HeartBeatRequest;
 import models.requests.BrokerUpdateRequest;
 import models.requests.Request;
+import models.requests.TopicReadWriteRequest;
+import models.responses.Response;
+import models.sync.DataPacket;
+import models.sync.OffsetRequest;
+import models.sync.OffsetResponse;
 
 import java.nio.ByteBuffer;
 
@@ -57,8 +62,8 @@ public class BrokerPacketHandler extends PacketHandler {
     /**
      * Create the election packet to send to high priority brokers
      */
-    public static byte[] createElectionPacket(String key) {
-        ElectionRequest electionRequest = new ElectionRequest(key);
+    public static byte[] createElectionPacket(String key, Host failedBroker) {
+        ElectionRequest electionRequest = new ElectionRequest(key, failedBroker);
         Request<ElectionRequest> request = new Request<>(BrokerConstants.REQUEST_TYPE.ELECTION, electionRequest);
 
         return createPacket(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.ELECTION, request);
@@ -82,5 +87,46 @@ public class BrokerPacketHandler extends PacketHandler {
         Request<BrokerUpdateRequest> request = new Request<>(BrokerConstants.REQUEST_TYPE.FAIL, brokerUpdateRequest);
 
         return createPacket(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.UPDATE, request);
+    }
+
+    /**
+     * Create the packet to request for the offset from the broker
+     */
+    public static byte[] createOffsetRequest(String key) {
+        OffsetRequest offsetRequest = new OffsetRequest(key);
+        Request<OffsetRequest> request = new Request<>(BrokerConstants.REQUEST_TYPE.OFFSET, offsetRequest);
+
+        return createPacket(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.REQ, request);
+    }
+
+    /**
+     * Create the response of offset request to send it to the broker
+     */
+    public static byte[] createOffsetResponse(String key, int offset, int size) {
+        OffsetResponse offsetResponse = new OffsetResponse(key, offset, size);
+        Response<OffsetResponse> response = new Response<>(BrokerConstants.RESPONSE_STATUS.OK, offsetResponse);
+
+        return createPacket(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.RESP, response);
+    }
+
+    /**
+     * Create the request to get the data from the broker from the given fromOffset
+     */
+    public static byte[] createGetDataRequest(String key, int fromOffset, int toOffset) {
+        String parts[] = key.split(":");
+        TopicReadWriteRequest topicReadWriteRequest = new TopicReadWriteRequest(parts[0], Integer.parseInt(parts[1]), fromOffset);
+        topicReadWriteRequest.setToOffset(toOffset);
+        Request<TopicReadWriteRequest> request = new Request<>(BrokerConstants.REQUEST_TYPE.GET, topicReadWriteRequest);
+
+        return createPacket(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.PULL, request);
+    }
+
+    /**
+     * Create the packet to contain the data packet to send to broker
+     */
+    public static byte[] createDataPacket(String key, String type, byte[] data, int toOffset) {
+        DataPacket dataPacket = new DataPacket(key, type, data, toOffset);
+
+        return createPacket(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.DATA, dataPacket);
     }
 }

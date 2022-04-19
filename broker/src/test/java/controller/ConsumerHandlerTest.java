@@ -2,8 +2,8 @@ package controller;
 
 import controllers.Connection;
 import controllers.consumer.ConsumerHandler;
-import models.File;
-import models.Segment;
+import models.data.File;
+import models.data.Segment;
 import models.requests.TopicReadWriteRequest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

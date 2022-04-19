@@ -1,6 +1,7 @@
-package models;
+package models.heartbeat;
 
 import com.google.gson.annotations.Expose;
+import models.Object;
 
 /**
  * Responsible for the holding heartbeat request values

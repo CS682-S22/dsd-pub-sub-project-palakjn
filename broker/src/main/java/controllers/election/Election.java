@@ -4,8 +4,8 @@ import configurations.BrokerConstants;
 import controllers.database.CacheManager;
 import controllers.heartbeat.FailureDetector;
 import controllers.loadBalancer.LBHandler;
-import controllers.replication.Broker;
-import models.ElectionRequest;
+import controllers.Broker;
+import models.election.ElectionRequest;
 import models.Host;
 import models.requests.Request;
 import utilities.BrokerPacketHandler;
@@ -32,28 +32,30 @@ public class Election {
 
         if (highPriorityBrokers != null) {
             //Sending "Election" message to those brokers
-            byte[] electionPacket = BrokerPacketHandler.createElectionPacket(key);
+            byte[] electionPacket = BrokerPacketHandler.createElectionPacket(key, null); //TODO: Pass failed broker info here
 
             for (Broker highPriorityBroker : highPriorityBrokers) {
                 boolean isSuccess = highPriorityBroker.send(electionPacket, BrokerConstants.CHANNEL_TYPE.HEARTBEAT, BrokerConstants.ELECTION_RESPONSE_WAIT_TIME, false);
 
                 if (isSuccess) {
                     //TODO: Log
-                    timer = new Timer();
-                    TimerTask task = new TimerTask() {
-                        @Override
-                        public void run() {
-                            checkForLeaderUpdate(key);
-                            timer.cancel();
-                            this.cancel();
-                        }
-                    };
-                    timer.schedule(task, BrokerConstants.ELECTION_RESPONSE_WAIT_TIME);
                 } else {
                     //TODO: Log
                     failureDetector.markDown(key, highPriorityBroker.getString());
                 }
             }
+
+            //TODO: check for if success
+            timer = new Timer();
+            TimerTask task = new TimerTask() {
+                @Override
+                public void run() {
+                    checkForLeaderUpdate(key);
+                    timer.cancel();
+                    this.cancel();
+                }
+            };
+            timer.schedule(task, BrokerConstants.ELECTION_RESPONSE_WAIT_TIME);
         } else {
             //No brokers with high priority found
 
@@ -74,13 +76,15 @@ public class Election {
         byte[] data = BrokerPacketHandler.getData(message);
 
         if (data != null) {
-            Request<ElectionRequest> electionRequest = JSONDesrializer.fromJson(data, Request.class);
+            Request<ElectionRequest> electionRequest = JSONDesrializer.deserializeRequest(data, ElectionRequest.class);
 
             if (electionRequest != null && electionRequest.getRequest() != null) {
                 ElectionRequest request = electionRequest.getRequest();
 
                 if (CacheManager.getStatus(request.getKey()) != BrokerConstants.BROKER_STATE.ELECTION) {
                     //TODO: Log
+                    //TODO: Check if current broker has failed broker info. If it is,
+                    //TODO: remove the broker from the collection. If not, then, log and continue
                     start(request.getKey());
                 } else {
                     //TODO: Log
