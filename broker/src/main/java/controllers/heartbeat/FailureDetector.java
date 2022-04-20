@@ -1,12 +1,14 @@
 package controllers.heartbeat;
 
 import configurations.BrokerConstants;
+import controllers.Broker;
 import controllers.Channels;
 import controllers.database.CacheManager;
 import controllers.loadBalancer.LBHandler;
-import controllers.Broker;
 import models.heartbeat.HeartBeatReceivedTime;
 import models.heartbeat.HeartBeatReceivedTimes;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import utilities.BrokerPacketHandler;
 
 /**
@@ -15,6 +17,7 @@ import utilities.BrokerPacketHandler;
  * @author Palak Jain
  */
 public class FailureDetector {
+    private static final Logger logger = LogManager.getLogger(FailureDetector.class);
     private HeartBeatReceivedTimes heartBeatReceivedTimes;
     private LBHandler lbHandler;
 
@@ -39,6 +42,8 @@ public class FailureDetector {
         }
 
         heartBeatReceivedTime.setTimespan(currentTime);
+        logger.info(String.format("[%s] Received heartbeat message from the broker %s for key %s at timer %d", CacheManager.getBrokerInfo().getString(), serverId, key, currentTime));
+        System.out.printf("[%s] Received heartbeat message from the broker %s for key %s at timer %d%n", CacheManager.getBrokerInfo().getString(), serverId, key, currentTime);
     }
 
     /**
@@ -46,12 +51,14 @@ public class FailureDetector {
      */
     public void markDown(String key, String serverId) {
         Broker broker = CacheManager.getBroker(key, serverId);
+        logger.info(String.format("[%s] Marking %s broker down for the partition %s.", CacheManager.getBrokerInfo().getString(), serverId, key));
 
         //Remove the broker from the list of brokers handling the partition of the topic
         CacheManager.removeBroker(key, broker);
 
         //Set the status of the current broker as "waiting for new follower"
         CacheManager.setStatus(key, BrokerConstants.BROKER_STATE.WAIT_FOR_NEW_FOLLOWER);
+        logger.info(String.format("[%s] Changing the status of broker to WAIT FOR NEW FOLLOWER when %s broker failed for the partition %s.", CacheManager.getBrokerInfo().getString(), serverId, key));
 
         //Checking if the current broker is leader of the topic partition
         if(CacheManager.isLeader(key, broker)) {
@@ -64,6 +71,9 @@ public class FailureDetector {
         //Letting load balancer know about it
         byte[] packet = BrokerPacketHandler.createFailBrokerPacket(key, broker);
         lbHandler.sendLeaderUpdate(packet);
+        logger.info(String.format("[%s] Send broker failure notification to load balancer.", CacheManager.getBrokerInfo().getString()));
+
+        HeartBeatSchedular.cancel(getTaskName(key, serverId));
 
         //Close down connection
         Channels.remove(serverId);
@@ -88,13 +98,8 @@ public class FailureDetector {
         long timeSinceLastHeartBeat = now - lastHeartBeatReceivedTime;
 
         if (timeSinceLastHeartBeat >= BrokerConstants.HEARTBEAT_TIMEOUT_THRESHOLD) {
-            if (receivedTime.isMaxRetry()) {
-                markDown(receivedTime.getKey(), receivedTime.getServerId());
-            } else {
-                receivedTime.incrementRetry();
-            }
-        } else {
-            receivedTime.resetRetryCount();
+            logger.warn(String.format("[%s] Marking broker %s failed as the time since last heart beat %d exceed %d threshold.", CacheManager.getBrokerInfo().getString(), receivedTime.getServerId(), timeSinceLastHeartBeat, BrokerConstants.HEARTBEAT_TIMEOUT_THRESHOLD));
+            markDown(receivedTime.getKey(), receivedTime.getServerId());
         }
     }
 

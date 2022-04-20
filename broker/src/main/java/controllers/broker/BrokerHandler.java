@@ -49,26 +49,25 @@ public class BrokerHandler {
      */
     public void handleRequest(Header.Content header, byte[] message) {
         if (header.getType() == BrokerConstants.TYPE.HEARTBEAT.getValue()) {
-            //TODO: Log
             HeartBeatReceiver heartBeatReceiver = new HeartBeatReceiver();
             heartBeatReceiver.handleRequest(connection, message);
         } else if (header.getType() == BrokerConstants.TYPE.ELECTION.getValue()) {
-            //TODO: Log
+            logger.info(String.format("[%s] Received \"Election\" message from the broker.", CacheManager.getBrokerInfo().getString()));
             hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER);
 
             Election election = new Election();
             election.handleRequest(message);
         } else if (header.getType() == BrokerConstants.TYPE.UPDATE.getValue()) {
-            //TODO: Log
+            logger.info(String.format("[%s] Received \"Update\" request from broker", CacheManager.getBrokerInfo().getString()));
             processUpdateRequest(message);
         } else if (header.getType() == BrokerConstants.TYPE.REQ.getValue()) {
-            //TODO: log
+            logger.info(String.format("[%s] Received \"REQ\" request from broker", CacheManager.getBrokerInfo().getString()));
             processREQRequest(message);
         } else if (header.getType() == BrokerConstants.TYPE.PULL.getValue()) {
-            //TODO: log
+            logger.info(String.format("[%s] Received \"PULL\" request from broker.", CacheManager.getBrokerInfo().getString()));
             processPullRequest(message);
         } else if (header.getType() == BrokerConstants.TYPE.DATA.getValue()) {
-            //TODO: log
+            logger.info(String.format("[%s] Received \"DATA\" request from broker.", CacheManager.getBrokerInfo().getString()));
             processDataRequest(message);
         }
     }
@@ -84,17 +83,16 @@ public class BrokerHandler {
 
             if (brokerUpdateRequest != null && brokerUpdateRequest.getRequest() != null) {
                 if (Objects.equals(brokerUpdateRequest.getType(), BrokerConstants.REQUEST_TYPE.LEADER)) {
-                    //TODO: Log
+                    logger.info(String.format("[%s] New leader %s being elected for the partition %s", CacheManager.getBrokerInfo().getString(), brokerUpdateRequest.getRequest().getBroker().getString(), brokerUpdateRequest.getRequest().getKey()));
                     CacheManager.setLeader(brokerUpdateRequest.getRequest().getKey(), new Broker(brokerUpdateRequest.getRequest().getBroker()));
                     hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER);
 
                     //Start sending heartbeat messages to another brokers
-                    //TODO: log
                     HeartBeatRequest heartBeatRequest = new HeartBeatRequest(brokerUpdateRequest.getRequest().getKey(), CacheManager.getBrokerInfo().getString(), brokerUpdateRequest.getRequest().getBroker().getString());
                     heartBeatSender.send(heartBeatRequest);
                     syncManager.sync(brokerUpdateRequest.getRequest().getKey());
                 } else {
-                    //TODO: log
+                    logger.warn(String.format("[%s] Receive unsupported broker update request packet %s.", CacheManager.getBrokerInfo().getString(), brokerUpdateRequest.getType()));
                 }
             }
         }
@@ -111,24 +109,24 @@ public class BrokerHandler {
 
             if (request != null && request.getRequest() != null && request.getRequest().isValid()) {
                 if (request.getType().equalsIgnoreCase(BrokerConstants.REQUEST_TYPE.OFFSET)) {
-                    //TODO: log
                     OffsetRequest offsetRequest = request.getRequest();
+                    logger.info(String.format("[%s] Request received to get the offset for the partition %s.", CacheManager.getBrokerInfo().getString(), offsetRequest.getKey()));
 
                     File partition = CacheManager.getPartition(offsetRequest.getKey());
 
                     if (partition != null) {
                         byte[] response = BrokerPacketHandler.createOffsetResponse(offsetRequest.getKey(), partition.getOffset(), partition.getTotalSize());
                         connection.send(response);
-                        //TODO: log
+                        logger.info(String.format("[%s] Send offset %s for the partition %s.", CacheManager.getBrokerInfo().getString(), partition.getOffset(), offsetRequest.getKey()));
                     } else {
-                        //TODO: log
+                        logger.info(String.format("[%s] Not able to send an offset response as broker not holding the partition %s.", CacheManager.getBrokerInfo().getString(), offsetRequest.getKey()));
                         hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER);
                     }
                 } else {
-                    //TODO: log
+                    logger.info(String.format("[%s] Received unsupported request type %s for REQ type", CacheManager.getBrokerInfo().getString(), request.getType()));
                 }
             } else {
-                //TODO: log
+                logger.info(String.format("[%s] Received invalid REQ request", CacheManager.getBrokerInfo().getString()));
             }
         }
     }
@@ -143,12 +141,12 @@ public class BrokerHandler {
             Request<TopicReadWriteRequest> request = JSONDesrializer.deserializeRequest(data, TopicReadWriteRequest.class);
 
             if (request != null && request.getRequest() != null && request.getRequest().isValid()) {
-                //TODO: log
                 TopicReadWriteRequest topicReadWriteRequest = request.getRequest();
+                logger.info(String.format("[%s] Received PULL request to send data to broker for partition %s from offset %s to offset %s", CacheManager.getBrokerInfo().getString(), topicReadWriteRequest.getName(), topicReadWriteRequest.getFromOffset(), topicReadWriteRequest.getToOffset()));
                 dataTransfer.setMethod(BrokerConstants.METHOD.SYNC);
                 dataTransfer.processRequest(topicReadWriteRequest);
             } else {
-                //TODO: log
+                logger.info(String.format("[%s] Received invalid PULL request", CacheManager.getBrokerInfo().getString()));
             }
         }
     }
@@ -163,35 +161,37 @@ public class BrokerHandler {
             Request<DataPacket> request = JSONDesrializer.deserializeRequest(data, DataPacket.class);
 
             if (request != null && request.getRequest() != null && request.getRequest().isValid()) {
-                //TODO: log
                 DataPacket dataPacket = request.getRequest();
+                logger.info(String.format("[%s] Received DATA packet [%s] for the partition key %s from another broker", CacheManager.getBrokerInfo().getString(), dataPacket.getDataType(), dataPacket.getKey()));
                 File partition = CacheManager.getPartition(dataPacket.getKey());
 
                 if (partition != null) {
                     boolean isSuccess = partition.write(dataPacket);
 
                     if (isSuccess) {
-                        //TODO: log
+                        logger.info(String.format("[%s] Sending ACK to the broker as written %s type data to local for the partition %s", CacheManager.getBrokerInfo().getString(), dataPacket.getDataType(), dataPacket.getKey()));
                         hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER);
 
                         if (toFlushBuffer(dataPacket, partition)) {
                             //flush to segment if received the data till snapshot taken from broker
                             partition.flushToSegment();
 
-                            sendDataToOutdatedBrokers(dataPacket, partition);
+                            if (CacheManager.isLeader(dataPacket.getKey(), CacheManager.getBrokerInfo())) {
+                                logger.info(String.format("[%s] Checking some of the followers the logs if they are behind the leader", CacheManager.getBrokerInfo().getString()));
+                                sendDataToOutdatedBrokers(dataPacket, partition);
+                            }
 
+                            logger.info(String.format("[%s] Received all the data from the snapshot taken with the leader. Flush the local buffer to the segment. Changing broker status to READY", CacheManager.getBrokerInfo().getString()));
                             CacheManager.setStatus(dataPacket.getKey(), BrokerConstants.BROKER_STATE.READY);
                         }
                     } else {
-                        //TODO: log
+                        logger.info(String.format("[%s] Unable to write the received data. Sending NACK", CacheManager.getBrokerInfo().getString()));
                         hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER);
                     }
                 } else {
-                    //TODO: log
+                    logger.info(String.format("[%s] Unable to write the received data as broker not handling the partition %s. Sending NACK", CacheManager.getBrokerInfo().getString(), dataPacket.getKey()));
                     hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER);
                 }
-            } else {
-                //TODO: log
             }
         }
     }

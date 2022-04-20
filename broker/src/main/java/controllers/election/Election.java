@@ -104,7 +104,7 @@ public class Election {
 
                 if (CacheManager.getStatus(request.getKey()) != BrokerConstants.BROKER_STATE.ELECTION) {
                     if (CacheManager.isLeader(request.getKey(), request.getFailedBroker())) {
-                        logger.info(String.format("[%s:%d] Received \"Election\" message and broker %s:%d failed. Starting election.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), request.getFailedBroker().getAddress(), request.getFailedBroker().getPort()));
+                        logger.info(String.format("[%s:%d] Received \"Election\" message and leader %s:%d failed. Starting election.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), request.getFailedBroker().getAddress(), request.getFailedBroker().getPort()));
                         CacheManager.removeBroker(request.getKey(), request.getFailedBroker());
                         start(request.getKey(), request.getFailedBroker());
                     } else {

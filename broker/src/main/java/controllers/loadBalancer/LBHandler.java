@@ -95,15 +95,15 @@ public class LBHandler {
                         //First checking if topic already exits
                         if (CacheManager.iSTopicExist(topic.getName())) {
                             if (isTopicWithPartitionsExist(topic)) {
-                                //TODO: log
+                                logger.info(String.format("[%s:%d] Got the new broker update request for topic-partition %s.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), topic.getPartitionString()));
                                 updateTopic(topic);
                                 hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                             } else {
-                                //TODO: log
+                                logger.warn(String.format("[%s] Broker handle the topic %s but not with the given partitions %s. Sending NACK", CacheManager.getBrokerInfo().getString(), topic.getName(), topic.getPartitionString()));
                                 hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                             }
                         } else if (topic.getNumOfPartitions() > 0) {
-                            //TODO: log
+                            logger.info(String.format("[%s] Got new topic information from load balancer. Updating the database", CacheManager.getBrokerInfo().getString()));
                             addTopic(topic);
 
                             hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
@@ -181,17 +181,22 @@ public class LBHandler {
                     heartBeatSender.send(heartBeatRequest);
                 }
 
+                logger.info(String.format("[%s] The membership table for thr partition of the topic %s is %s.", CacheManager.getBrokerInfo(), partition.getString(), partition.getMemberShipTable()));
+
                 if (CacheManager.isLeader(partition.getString(), CacheManager.getBrokerInfo())) {
                     //If the current broker is leader of the topic then, change the status to READY
+                    logger.info(String.format("[%s] Broker is the leader of the partition %s.", CacheManager.getBrokerInfo().getString(), partition.getString()));
                     CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.READY);
                 } else {
                     //If the current broker is follower of the topic then,
                     if (!partition.getLeader().isActive()) {
                         // If the leader for the given partition is not active then, start the election
+                        logger.info(String.format("[%s] New follower. Leader is inactive. Starting election to elect new leader.", CacheManager.getBrokerInfo().getString()));
                         CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.ELECTION);
                         election.start(partition.getString(), partition.getLeader());
                     } else {
                         // If the leader is active then, changing the status to SYNC mode and starting catching up with leader
+                        logger.info(String.format("[%s] New follower. Sync data with the leader", CacheManager.getBrokerInfo().getString()));
                         syncManager.sync(partition.getString());
                     }
                 }
@@ -211,7 +216,8 @@ public class LBHandler {
         for (Partition partition : topic.getPartitions()) {
             for (Host broker : partition.getBrokers()) {
                 if (!CacheManager.isExist(partition.getString(), broker)) {
-                    //TODO: Log
+                    logger.info(String.format("[%s] Received new follower %s information from load balancer to handle partition %s.", CacheManager.getBrokerInfo().getString(), broker.getString(), partition.getString()));
+                    CacheManager.addBroker(partition.getString(), new Broker(broker));
 
                     //Start sending heartbeat messages to the broker
                     HeartBeatRequest heartBeatRequest = new HeartBeatRequest(partition.getString(), CacheManager.getBrokerInfo().getString(), broker.getString());
@@ -220,10 +226,12 @@ public class LBHandler {
 
                 if (!partition.getLeader().isActive()) {
                     // If the leader for the given partition is not active then, start the election
+                    logger.info(String.format("[%s] Leader is failed for the partition %s. Starting election.", CacheManager.getBrokerInfo().getString(), partition.getString()));
                     CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.ELECTION);
                     election.start(partition.getString(), partition.getLeader());
                 } else {
                     //If new follower is added, then keep the status of current broker for the partition as READY
+                    logger.debug(String.format("[%s] Set the status of the follower as READY after adding new broker information.", CacheManager.getBrokerInfo().getString()));
                     CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.READY);
                 }
             }

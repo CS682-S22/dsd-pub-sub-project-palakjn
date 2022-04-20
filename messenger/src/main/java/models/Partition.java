@@ -70,6 +70,22 @@ public class Partition extends Object {
     }
 
     /**
+     * Get the membership table of the partition in string format
+     */
+    public String getMemberShipTable() {
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append(String.format("Leader: %s", leader.getString()));
+
+        for (Host broker : brokers) {
+            if (!broker.isLeader()) {
+                stringBuilder.append(String.format(", Follower: %s", broker.getString()));
+            }
+        }
+
+        return stringBuilder.toString();
+    }
+
+    /**
      * Add the broker to the list
      */
     public void addBroker(Host broker) {

@@ -4,6 +4,7 @@ import configurations.BrokerConstants;
 import controllers.Connection;
 import controllers.HostService;
 import controllers.Channels;
+import controllers.database.CacheManager;
 import models.heartbeat.HeartBeatRequest;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -28,6 +29,7 @@ public class HeartBeatSender {
         Connection connection = connect(request.getReceivedId());
 
         if (connection != null) {
+            logger.info(String.format("[%s] Start sending heartbeat messages to the server id %s for key %s.", CacheManager.getBrokerInfo().getString(), request.getReceivedId(), request.getKey()));
             Runnable task = new HeartBeatTask(connection, request);
             HeartBeatSchedular.start(request.getKey(), task, BrokerConstants.HEARTBEAT_INTERVAL_MS);
 
