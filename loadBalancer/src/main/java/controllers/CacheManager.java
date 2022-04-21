@@ -154,6 +154,21 @@ public class CacheManager {
     }
 
     /**
+     * Get the broker object with the given key
+     */
+    public static Host getBroker(String key) {
+        Host broker;
+        brokerLock.readLock().lock();
+
+        String[] parts = key.split(":");
+
+        broker = brokers.stream().filter(host -> host.getAddress().equals(parts[0]) && host.getPort() == Integer.parseInt(parts[1])).findAny().orElse(null);
+
+        brokerLock.readLock().unlock();
+        return broker;
+    }
+
+    /**
      * Get the number of brokers in the network
      */
     public static int getNumberOfBrokers() {
@@ -247,6 +262,23 @@ public class CacheManager {
 
         topicLock.writeLock().unlock();
         return new Topic(partition.getTopicName(), partition);
+    }
+
+    /**
+     * Check if the received request to mark broker failure is already happen
+     */
+    public static boolean isFailureHandled(BrokerUpdateRequest request) {
+        boolean isHandled = false;
+        topicLock.readLock().lock();
+
+        Host broker = getBroker(request.getBroker().getAddress(), request.getBroker().getPort());
+
+        if (!broker.isActive()) {
+            isHandled = true;
+        }
+
+        topicLock.readLock().unlock();
+        return isHandled;
     }
 
     /**

@@ -1,5 +1,6 @@
 package controllers.election;
 
+import com.google.gson.reflect.TypeToken;
 import configurations.BrokerConstants;
 import controllers.database.CacheManager;
 import controllers.heartbeat.FailureDetector;
@@ -44,7 +45,7 @@ public class Election {
         //Getting brokers with higher priority than the current one
         List<Broker> highPriorityBrokers = CacheManager.getBrokers(key, BrokerConstants.PRIORITY_CHOICE.HIGH);
 
-        if (highPriorityBrokers != null) {
+        if (highPriorityBrokers != null && highPriorityBrokers.size() > 0) {
             //Sending "Election" message to those brokers
             logger.info(String.format("[%s:%d] Sending \"Election\" message to %d high priority brokers.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), highPriorityBrokers.size()));
             byte[] electionPacket = BrokerPacketHandler.createElectionPacket(key, failedBroker);
@@ -86,7 +87,7 @@ public class Election {
             sendLeaderUpdate(key);
 
             //Set the broker instance to "Sync"
-            syncManager.sync(key);
+//            syncManager.sync(key);
         }
     }
 
@@ -97,7 +98,7 @@ public class Election {
         byte[] data = BrokerPacketHandler.getData(message);
 
         if (data != null) {
-            Request<ElectionRequest> electionRequest = JSONDesrializer.deserializeRequest(data, ElectionRequest.class);
+            Request<ElectionRequest> electionRequest = JSONDesrializer.deserializeRequest(data, new TypeToken<Request<ElectionRequest>>(){}.getType());
 
             if (electionRequest != null && electionRequest.getRequest() != null) {
                 ElectionRequest request = electionRequest.getRequest();

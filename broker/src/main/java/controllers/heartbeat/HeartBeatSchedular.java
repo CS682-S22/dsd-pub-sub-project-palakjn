@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit;
  * @author Palak Jain
  */
 public class HeartBeatSchedular {
-    private static ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(BrokerConstants.MAX_HEARTBEAT_TASKS);
+    private static ScheduledThreadPoolExecutor heartBeatExecutor = new ScheduledThreadPoolExecutor(BrokerConstants.MAX_HEARTBEAT_TASKS);
     private static Map<String, ScheduledFuture<?>> scheduledTasks = new HashMap<>();
 
     private HeartBeatSchedular() {}
@@ -23,7 +23,8 @@ public class HeartBeatSchedular {
      * Schedule the given task to run at the fixed periodic interval
      */
     public synchronized static void start(String taskName, Runnable task, long period) {
-        ScheduledFuture<?> scheduledTask = executor.scheduleWithFixedDelay(task, period, period, TimeUnit.MILLISECONDS);
+        ScheduledFuture<?> scheduledTask = heartBeatExecutor.scheduleWithFixedDelay(task, period, period, TimeUnit.MILLISECONDS);
+
         scheduledTasks.put(taskName, scheduledTask);
     }
 

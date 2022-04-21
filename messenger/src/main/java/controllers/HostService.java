@@ -36,6 +36,7 @@ public class HostService {
             }
         } catch (IOException exception) {
             logger.error(String.format("[%s:%d] Fail to make connection with the host.", address, port), exception.getMessage());
+            exception.printStackTrace();
         }
 
         return connection;
@@ -105,7 +106,7 @@ public class HostService {
                         logger.warn(String.format("[%s:%d] Received negative acknowledgment for the request from the host %s:%d. Not retrying.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
                         running = false;
                     } else {
-                        logger.warn(String.format("[%s:%d] Received wrong packet type i.e. %d for the request from the host %s:%d. Retrying.", connection.getSourceIPAddress(), connection.getSourcePort(), connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getType()));
+                        logger.warn(String.format("[%s:%d] Received wrong packet type i.e. %d for the request from the host %s:%d. Retrying.", connection.getSourceIPAddress(), connection.getSourcePort(), header.getType(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
                         connection.send(packet);
                     }
                 } else {

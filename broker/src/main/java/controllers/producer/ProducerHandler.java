@@ -1,5 +1,6 @@
 package controllers.producer;
 
+import com.google.gson.reflect.TypeToken;
 import configuration.Constants;
 import configurations.BrokerConstants;
 import controllers.Connection;
@@ -7,6 +8,7 @@ import controllers.HostService;
 import controllers.consumer.Subscriber;
 import controllers.database.CacheManager;
 import models.Header;
+import models.Host;
 import models.data.File;
 import models.requests.Request;
 import models.requests.TopicReadWriteRequest;
@@ -38,7 +40,7 @@ public class ProducerHandler {
             byte[] body = BrokerPacketHandler.getData(message);
 
             if (body != null) {
-                Request<TopicReadWriteRequest> request = JSONDesrializer.deserializeRequest(body, TopicReadWriteRequest.class);
+                Request<TopicReadWriteRequest> request = JSONDesrializer.deserializeRequest(body, new TypeToken<Request<TopicReadWriteRequest>>(){}.getType());
                 TopicReadWriteRequest writeTopicRequest = null;
 
                 if (request != null) {

@@ -1,7 +1,9 @@
 package controllers.loadBalancer;
 
+import com.google.gson.reflect.TypeToken;
 import configuration.Constants;
 import configurations.BrokerConstants;
+import controllers.Brokers;
 import controllers.Channels;
 import controllers.Connection;
 import controllers.HostService;
@@ -19,6 +21,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import utilities.BrokerPacketHandler;
 import utilities.JSONDesrializer;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Responsible for handling requests from load balancer.
@@ -66,7 +71,9 @@ public class LBHandler {
                     Header.Content header = BrokerPacketHandler.getHeader(request);
 
                     logger.info("Received request from Load Balancer.");
-                    processRequest(header, request);
+                    if (header != null) {
+                        processRequest(header, request);
+                    }
                 }
             }
         }
@@ -81,7 +88,7 @@ public class LBHandler {
             byte[] body = BrokerPacketHandler.getData(packet);
 
             if (body != null) {
-                Request<Topic> topicRequest = JSONDesrializer.deserializeRequest(body, Topic.class);
+                Request<Topic> topicRequest = JSONDesrializer.deserializeRequest(body, new TypeToken<Request<Topic>>(){}.getType());
                 Topic topic = null;
 
                 if (topicRequest != null) {
@@ -97,32 +104,24 @@ public class LBHandler {
                             if (isTopicWithPartitionsExist(topic)) {
                                 logger.info(String.format("[%s:%d] Got the new broker update request for topic-partition %s.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), topic.getPartitionString()));
                                 updateTopic(topic);
-                                hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                             } else {
-                                logger.warn(String.format("[%s] Broker handle the topic %s but not with the given partitions %s. Sending NACK", CacheManager.getBrokerInfo().getString(), topic.getName(), topic.getPartitionString()));
-                                hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                                logger.warn(String.format("[%s] Broker handle the topic %s but not with the given partitions %s.", CacheManager.getBrokerInfo().getString(), topic.getName(), topic.getPartitionString()));
                             }
                         } else if (topic.getNumOfPartitions() > 0) {
                             logger.info(String.format("[%s] Got new topic information from load balancer. Updating the database", CacheManager.getBrokerInfo().getString()));
                             addTopic(topic);
-
-                            hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                         } else {
-                            logger.warn(String.format("[%s:%d] Received no partitions for the topic %s from the load balancer. Will send NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
-                            hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                            logger.warn(String.format("[%s:%d] Received no partitions for the topic %s from the load balancer.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName()));
                         }
                     }
                 } else {
-                    logger.warn(String.format("[%s:%d] Received invalid topic information from the load balancer. Will send NACK", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                    hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                    logger.warn(String.format("[%s:%d] Received invalid topic information from the load balancer.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
                 }
             } else {
-                logger.warn(String.format("[%s:%d] Received empty request body from the producer. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
-                hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+                logger.warn(String.format("[%s:%d] Received empty request body from the producer.", connection.getDestinationIPAddress(), connection.getDestinationPort()));
             }
         } else {
-            logger.warn(String.format("[%s:%d] Received unsupported action %d from the load balancer. Will send NACK", connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getType()));
-            hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
+            logger.warn(String.format("[%s:%d] Received unsupported action %d from the load balancer.", connection.getDestinationIPAddress(), connection.getDestinationPort(), header.getType()));
         }
     }
 
@@ -176,9 +175,11 @@ public class LBHandler {
                 for (Host broker : partition.getBrokers()) {
                     CacheManager.addBroker(partition.getString(), new Broker(broker));
 
-                    //Start sending heartbeat messages to another brokers
-                    HeartBeatRequest heartBeatRequest = new HeartBeatRequest(partition.getString(), CacheManager.getBrokerInfo().getString(), broker.getString());
-                    heartBeatSender.send(heartBeatRequest);
+                    if (broker.isActive()) {
+                        //Start sending heartbeat messages to another brokers
+                        HeartBeatRequest heartBeatRequest = new HeartBeatRequest(partition.getString(), CacheManager.getBrokerInfo().getString(), broker.getHeartBeatString());
+                        heartBeatSender.send(heartBeatRequest);
+                    }
                 }
 
                 logger.info(String.format("[%s] The membership table for thr partition of the topic %s is %s.", CacheManager.getBrokerInfo(), partition.getString(), partition.getMemberShipTable()));
@@ -202,7 +203,7 @@ public class LBHandler {
                 }
 
                 logger.info(String.format("[%s:%d] Added topic %s - partition %d information to the local cache.", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
-                System.out.printf("Handling topic %s - partition %d.\n", partition.getTopicName(), partition.getNumber());
+                System.out.printf("Handling topic %s - partition %d. Membership table: %s\n", partition.getTopicName(), partition.getNumber(), partition.getMemberShipTable());
             } else {
                 logger.warn(String.format("[%s:%d] Fail to create directory for the topic- %s - Partition %d", connection.getDestinationIPAddress(), connection.getDestinationPort(), partition.getTopicName(), partition.getNumber()));
             }
@@ -214,27 +215,29 @@ public class LBHandler {
      */
     private void updateTopic(Topic topic) {
         for (Partition partition : topic.getPartitions()) {
-            for (Host broker : partition.getBrokers()) {
-                if (!CacheManager.isExist(partition.getString(), broker)) {
-                    logger.info(String.format("[%s] Received new follower %s information from load balancer to handle partition %s.", CacheManager.getBrokerInfo().getString(), broker.getString(), partition.getString()));
-                    CacheManager.addBroker(partition.getString(), new Broker(broker));
+            List<Host> brokersToSendHeartBeat = new ArrayList<>();
 
-                    //Start sending heartbeat messages to the broker
-                    HeartBeatRequest heartBeatRequest = new HeartBeatRequest(partition.getString(), CacheManager.getBrokerInfo().getString(), broker.getString());
-                    heartBeatSender.send(heartBeatRequest);
-                }
+            Brokers receivedBrokers = new Brokers(partition.getBrokers());
+            CacheManager.updateMembershipTable(partition.getString(), receivedBrokers, brokersToSendHeartBeat);
 
-                if (!partition.getLeader().isActive()) {
-                    // If the leader for the given partition is not active then, start the election
-                    logger.info(String.format("[%s] Leader is failed for the partition %s. Starting election.", CacheManager.getBrokerInfo().getString(), partition.getString()));
-                    CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.ELECTION);
-                    election.start(partition.getString(), partition.getLeader());
-                } else {
-                    //If new follower is added, then keep the status of current broker for the partition as READY
-                    logger.debug(String.format("[%s] Set the status of the follower as READY after adding new broker information.", CacheManager.getBrokerInfo().getString()));
-                    CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.READY);
-                }
+            for (Host broker : brokersToSendHeartBeat) {
+                //Start sending heartbeat messages to the broker
+                HeartBeatRequest heartBeatRequest = new HeartBeatRequest(partition.getString(), CacheManager.getBrokerInfo().getString(), broker.getHeartBeatString());
+                heartBeatSender.send(heartBeatRequest);
             }
+
+            if (!partition.getLeader().isActive()) {
+                // If the leader for the given partition is not active then, start the election
+                logger.info(String.format("[%s] Leader is failed for the partition %s. Starting election.", CacheManager.getBrokerInfo().getString(), partition.getString()));
+                CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.ELECTION);
+                election.start(partition.getString(), partition.getLeader());
+            } else {
+                //If new follower is added, then keep the status of current broker for the partition as READY
+                logger.debug(String.format("[%s] Set the status of the follower as READY after adding new broker information.", CacheManager.getBrokerInfo().getString()));
+                CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.READY);
+            }
+
+            System.out.printf("Updated membership table for the topic %s - partition %d: %s\n", partition.getTopicName(), partition.getNumber(), partition.getMemberShipTable());
         }
     }
 
@@ -282,6 +285,7 @@ public class LBHandler {
                             logger.info(String.format("[%s:%d] Received a response for the %s request from the host %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
 
                             running = !getPriorityNum(responseBytes);
+                            isSuccess = !running;
                         } else {
                             logger.warn(String.format("[%s:%d] Received wrong packet type i.e. %d for the %s request from the host %s:%d. Retrying.", connection.getSourceIPAddress(), connection.getSourcePort(), header.getType(), type, connection.getDestinationIPAddress(), connection.getDestinationPort()));
                             connection.send(packet);
@@ -313,11 +317,12 @@ public class LBHandler {
         byte[] body = BrokerPacketHandler.getData(responseBytes);
 
         if (body != null) {
-            Response<JoinResponse> joinResponse = JSONDesrializer.deserializeResponse(body, JoinResponse.class);
+            Response<JoinResponse> joinResponse = JSONDesrializer.deserializeResponse(body, new TypeToken<Response<JoinResponse>>(){}.getType());
 
             if (joinResponse != null && joinResponse.isValid() && joinResponse.isOk()) {
                 CacheManager.setPriorityNum(joinResponse.getObject().getPriorityNum());
-                logger.info(String.format("Broker %s:%d priority number is %d.", connection.getSourceIPAddress(), connection.getSourcePort(), CacheManager.getPriorityNum()));
+                logger.info(String.format("[%s] Joined the network with the priority number is %d.", CacheManager.getBrokerInfo().getString(), CacheManager.getPriorityNum()));
+                System.out.printf("[%s] Joined the network with the priority number is %d. \n", CacheManager.getBrokerInfo().getString(), CacheManager.getPriorityNum());
                 isSet = true;
             }
         }

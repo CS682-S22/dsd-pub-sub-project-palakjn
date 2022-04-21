@@ -1,11 +1,14 @@
 package controllers.replication;
 
+import com.google.gson.reflect.TypeToken;
 import configurations.BrokerConstants;
 import controllers.Broker;
 import controllers.Brokers;
 import controllers.HostService;
 import controllers.database.CacheManager;
+import models.Host;
 import models.data.File;
+import models.requests.Request;
 import models.responses.Response;
 import models.sync.OffsetResponse;
 import org.apache.logging.log4j.LogManager;
@@ -71,7 +74,7 @@ public class SyncManager {
                 byte[] response =  broker.sendAndGetResponse(packet, BrokerConstants.CHANNEL_TYPE.DATA, BrokerConstants.ACK_WAIT_TIME, true);
 
                 if (response != null) {
-                    Response<OffsetResponse> offsetResponse = JSONDesrializer.deserializeResponse(response, OffsetResponse.class);
+                    Response<OffsetResponse> offsetResponse = JSONDesrializer.deserializeResponse(response, new TypeToken<Response<OffsetResponse>>(){}.getType());
 
                     if (offsetResponse != null && offsetResponse.isValid() && offsetResponse.isOk()) {
                         logger.info(String.format("[%s] Received offset response from broker %s. Offset is %d for the key %s", CacheManager.getBrokerInfo().getString(), broker.getString(), offsetResponse.getObject().getOffset(), key));
@@ -127,7 +130,7 @@ public class SyncManager {
             byte[] response =  leader.sendAndGetResponse(packet, BrokerConstants.CHANNEL_TYPE.DATA, BrokerConstants.ACK_WAIT_TIME, true);
 
             if (response != null) {
-                Response<OffsetResponse> offsetResponse = JSONDesrializer.deserializeResponse(response, OffsetResponse.class);
+                Response<OffsetResponse> offsetResponse = JSONDesrializer.deserializeResponse(response, new TypeToken<Response<OffsetResponse>>(){}.getType());
 
                 if (offsetResponse != null && offsetResponse.isValid() && offsetResponse.isOk()) {
                     logger.info(String.format("[%s] Received offset response from leader %s. Offset is %d for the key %s", CacheManager.getBrokerInfo().getString(), leader.getString(), offsetResponse.getObject().getOffset(), key));

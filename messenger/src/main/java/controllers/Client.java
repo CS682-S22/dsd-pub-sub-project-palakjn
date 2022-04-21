@@ -1,9 +1,11 @@
 package controllers;
 
+import com.google.gson.reflect.TypeToken;
 import configuration.Constants;
 import models.Header;
 import models.Host;
 import models.Properties;
+import models.requests.Request;
 import models.responses.Response;
 import org.apache.logging.log4j.Logger;
 import utilities.JSONDesrializer;
@@ -98,7 +100,7 @@ public class Client {
                                     byte[] body = PacketHandler.getData(responseBytes);
 
                                     if (body != null) {
-                                        Response<Host> response = JSONDesrializer.deserializeResponse(body, Host.class);
+                                        Response<Host> response = JSONDesrializer.deserializeResponse(body, new TypeToken<Response<Host>>(){}.getType());
 
                                         if (response != null && response.isValid()) {
                                             if (response.isInSync()) {

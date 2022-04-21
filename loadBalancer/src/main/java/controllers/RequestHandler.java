@@ -1,5 +1,6 @@
 package controllers;
 
+import com.google.gson.reflect.TypeToken;
 import configuration.Constants;
 import models.*;
 import models.requests.CreateTopicRequest;
@@ -72,7 +73,7 @@ public class RequestHandler {
 
         if (body != null) {
             if (type.equals(Constants.TYPE.REQ.name())) {
-                Request<Host> request = JSONDesrializer.deserializeRequest(body, Host.class);
+                Request<Host> request = JSONDesrializer.deserializeRequest(body, new TypeToken<Request<Host>>(){}.getType());
 
                 if (request != null) {
                     Host broker = request.getRequest();
@@ -83,7 +84,7 @@ public class RequestHandler {
                             broker = CacheManager.addBroker(broker);
 
                             //Saving the connection between broker and load-balancer for future updates
-                            Channels.add(broker.getString(), connection, Constants.CHANNEL_TYPE.LOADBALANCER);
+                            Channels.add(broker.getString(), connection, Constants.CHANNEL_TYPE.BROKER);
 
                             //Sending response to the broker with the priority number
                             sendJoinResponse(broker);
@@ -104,7 +105,7 @@ public class RequestHandler {
                     }
                 }
             } else if (type.equals(Constants.TYPE.UPDATE.name())) {
-                Request<BrokerUpdateRequest> request = JSONDesrializer.deserializeRequest(body, BrokerUpdateRequest.class);
+                Request<BrokerUpdateRequest> request = JSONDesrializer.deserializeRequest(body, new TypeToken<Request<BrokerUpdateRequest>>(){}.getType());
 
                 if (request != null) {
                     BrokerUpdateRequest brokerUpdateRequest = request.getRequest();
@@ -112,9 +113,13 @@ public class RequestHandler {
                     if (brokerUpdateRequest != null && brokerUpdateRequest.isValid()) {
                         if (request.getType().equalsIgnoreCase(Constants.REQUEST_TYPE.FAIL)) {
                             logger.info(String.format("[%s:%d] Received request to indicate the failure of broker %s:%d handling topic %s:%d", connection.getDestinationIPAddress(), connection.getDestinationPort(), brokerUpdateRequest.getBroker().getAddress(), brokerUpdateRequest.getBroker().getPort(), brokerUpdateRequest.getTopic(), brokerUpdateRequest.getPartition()));
-                            Topic topic = CacheManager.updateMDAfterFailure(brokerUpdateRequest);
-
-                            sendToBrokers(topic);
+                            if (CacheManager.isFailureHandled(brokerUpdateRequest)) {
+                                logger.info(String.format("[%s:%d] Request for updating broker %s failure is being already processed.", connection.getDestinationIPAddress(), connection.getDestinationPort(), brokerUpdateRequest.getBroker().getString()));
+                            } else {
+                                Topic topic = CacheManager.updateMDAfterFailure(brokerUpdateRequest);
+                                logger.info(String.format("[%s:%d] Marking broker %s inactive and finding new follower.", connection.getDestinationIPAddress(), connection.getDestinationPort(), brokerUpdateRequest.getBroker().getString()));
+                                sendToBrokers(topic);
+                            }
                         } else if (request.getType().equalsIgnoreCase(Constants.REQUEST_TYPE.LEADER)) {
                             logger.info(String.format("[%s:%d] Received request to set the broker %s:%d as a leader which will handle the topic %s:%d", connection.getDestinationIPAddress(), connection.getDestinationPort(), brokerUpdateRequest.getBroker().getAddress(), brokerUpdateRequest.getBroker().getPort(), brokerUpdateRequest.getTopic(), brokerUpdateRequest.getPartition()));
                             CacheManager.updateLeader(brokerUpdateRequest);
@@ -136,7 +141,7 @@ public class RequestHandler {
         byte[] responseBytes = null;
 
         if (body != null) {
-            Request<GetBrokerRequest> request = JSONDesrializer.deserializeRequest(body, GetBrokerRequest.class);
+            Request<GetBrokerRequest> request = JSONDesrializer.deserializeRequest(body, new TypeToken<Request<GetBrokerRequest>>(){}.getType());
             GetBrokerRequest getBrokerRequest = null;
 
             if (request != null) {
@@ -180,7 +185,7 @@ public class RequestHandler {
         byte[] body = LBPacketHandler.getData(message);
 
         if (body != null) {
-            Request<CreateTopicRequest> request = JSONDesrializer.deserializeRequest(body, CreateTopicRequest.class);
+            Request<CreateTopicRequest> request = JSONDesrializer.deserializeRequest(body, new TypeToken<Request<CreateTopicRequest>>(){}.getType());
             CreateTopicRequest topicRequest = null;
 
             if (request != null && request.getRequest() != null) {
@@ -251,7 +256,7 @@ public class RequestHandler {
 
         for (Map.Entry<String, Topic> entry : partitionsPerBroker.entrySet()) {
             //Per partition, assign a thread to send the partition information to the broker
-            threadPool.execute(() -> sendToBroker(entry.getValue()));
+            threadPool.execute(() -> sendToBroker(entry.getKey(), entry.getValue()));
         }
 
         threadPool.shutdown();
@@ -260,15 +265,15 @@ public class RequestHandler {
     /**
      * Send the partitions' information of a topic to the broker which is going to handle them.
      */
-    private void sendToBroker(Topic topic) {
-        Host brokerInfo = topic.getPartitions().get(0).getLeader();
+    private void sendToBroker(String brokerKey, Topic topic) {
+        Host brokerInfo = CacheManager.getBroker(brokerKey);
         Connection connection = connect(brokerInfo);
 
         if (connection != null && connection.isOpen()) {
-            logger.debug(String.format("[%s:%d] Sending the the topic %s - Partitions {%s} information to the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getPartitionString()));
+            logger.debug(String.format("[%s:%d] Sending the the topic %s - Partitions {%s} information to the broker %s:.", connection.getSourceIPAddress(), connection.getSourcePort(), topic.getName(), topic.getPartitionString(), brokerKey));
             Request<Topic> request = new Request<>(Constants.REQUEST_TYPE.ADD, topic);
             byte[] packet = LBPacketHandler.createPacket(Constants.TYPE.REQ, request);
-            boolean isSuccess = hostService.sendPacketWithACK(connection, packet, Constants.ACK_WAIT_TIME);
+            boolean isSuccess = connection.send(packet);
             if (isSuccess) {
                 logger.info(String.format("[%s:%d] Send the topic %s - Partitions {%s} information to the broker.", connection.getDestinationIPAddress(), connection.getDestinationPort(), topic.getName(), topic.getPartitionString()));
             } else {

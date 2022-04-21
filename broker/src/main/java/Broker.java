@@ -59,10 +59,10 @@ public class Broker {
                     dataConnectionThread.start();
 
                     //Starting thread to listen for the HEARTBEAT/ELECTION connections
-                    logger.info(String.format("[%s] Listening on HEARTBEAT/ELECTION port %d.", config.getHeartBeatServer().getAddress(), config.getHeartBeatServer().getPort()));
-                    System.out.printf("[%s] Listening on HEARTBEAT/ELECTION port %d.\n", config.getHeartBeatServer().getAddress(), config.getHeartBeatServer().getPort());
+                    logger.info(String.format("[%s] Listening on HEARTBEAT/ELECTION port %d.", config.getLocal().getAddress(), config.getLocal().getHeartBeatPort()));
+                    System.out.printf("[%s] Listening on HEARTBEAT/ELECTION port %d.\n", config.getLocal().getAddress(), config.getLocal().getHeartBeatPort());
 
-                    Thread heartBeatThread = new Thread(() -> broker.listen(config.getHeartBeatServer().getAddress(), config.getHeartBeatServer().getPort()));
+                    Thread heartBeatThread = new Thread(() -> broker.listen(config.getLocal().getAddress(), config.getLocal().getHeartBeatPort()));
                     heartBeatThread.start();
                 }
             }

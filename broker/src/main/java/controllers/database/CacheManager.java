@@ -1,11 +1,15 @@
 package controllers.database;
 
 import configurations.BrokerConstants;
-import controllers.consumer.Subscriber;
 import controllers.Broker;
 import controllers.Brokers;
-import models.data.File;
+import controllers.consumer.Subscriber;
 import models.Host;
+import models.data.File;
+import models.heartbeat.HeartBeatReceivedTime;
+import models.heartbeat.HeartBeatReceivedTimes;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,6 +23,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * @author Palak Jain
  */
 public class CacheManager {
+    private static final Logger logger = LogManager.getLogger(CacheManager.class);
+
     //Details of local broker
     private static Host broker;
 
@@ -39,11 +45,15 @@ public class CacheManager {
     private static Map<String, Broker> leaders = new HashMap<>();
     private static Map<String, Brokers> brokers = new HashMap<>();
 
+    //Heartbeat
+    private static HeartBeatReceivedTimes heartBeatReceivedTimes = new HeartBeatReceivedTimes();
+
     //Lock to make data structures thread-safe
     private static ReentrantReadWriteLock topicLock = new ReentrantReadWriteLock();
     private static ReentrantReadWriteLock subscriberLock = new ReentrantReadWriteLock();
     private static ReentrantReadWriteLock leadersLock = new ReentrantReadWriteLock();
     private static ReentrantReadWriteLock brokerLock = new ReentrantReadWriteLock();
+    private static ReentrantReadWriteLock heartBeatLock = new ReentrantReadWriteLock();
 
     private CacheManager() {
     }
@@ -342,6 +352,78 @@ public class CacheManager {
     }
 
     /**
+     * Update local membership table according to the received brokers from load balancer.
+     */
+    public static void updateMembershipTable(String key, Brokers receivedBrokers, List<Host> heartbeat) {
+        brokerLock.writeLock().lock();
+
+        //Iterating through received brokers to check if broker exist
+        for (Host broker : receivedBrokers.getBrokers()) {
+            if(!isExist(key, broker)) {
+                logger.info(String.format("[%s] Received new follower %s information from load balancer to handle partition %s.", CacheManager.getBrokerInfo().getString(), broker.getString(), key));
+                addBroker(key, new Broker(broker));
+                heartbeat.add(broker);
+            }
+        }
+
+        //Iterating through have brokers to check which one is missing in received brokers
+        Brokers collection = brokers.getOrDefault(key, null);
+        if (collection != null) {
+            for (Broker broker : collection.getBrokers()) {
+                if (!receivedBrokers.contains(broker)) {
+                    logger.info(String.format("[%s] Missing broker %s information in the latest membership table received from load balancer to handle partition %s.", CacheManager.getBrokerInfo().getString(), broker.getString(), key));
+                    removeBroker(key, broker);
+                }
+            }
+        }
+
+        brokerLock.writeLock().unlock();
+    }
+
+    /**
+     * Get the membership table of the partition in string format
+     */
+    public static String getMemberShipTable(String key) {
+        topicLock.readLock().lock();
+        StringBuilder stringBuilder = new StringBuilder();
+        Host leader = getLeader(key);
+
+        if (leader != null) {
+            stringBuilder.append(String.format("Leader: %s", leader.getString()));
+
+            Brokers collection = getBrokers(key);
+
+            if (collection != null) {
+                for (Host broker : collection.getBrokers()) {
+                    stringBuilder.append(String.format(", Broker: %s", broker.getString()));
+                }
+            }
+        }
+
+        topicLock.readLock().unlock();
+        return stringBuilder.toString();
+    }
+
+    /**
+     * Change the status of the broker to wait for follower
+     */
+    public static boolean changeStatusToWaitForFollower(String key, String serverId) {
+        boolean isSet = false;
+        brokerLock.writeLock().lock();
+
+        Broker broker = CacheManager.getBroker(key, serverId);
+        if (broker != null) {
+            removeBroker(key, broker);
+            setStatus(key, BrokerConstants.BROKER_STATE.WAIT_FOR_NEW_FOLLOWER);
+            logger.info(String.format("[%s] Changing the status of broker to WAIT FOR NEW FOLLOWER when %s broker failed for the partition %s.", CacheManager.getBrokerInfo().getString(), serverId, key));
+            isSet = true;
+        }
+
+        brokerLock.writeLock().unlock();
+        return isSet;
+    }
+
+    /**
      * Get the list of brokers which has high priority number than current broker priority number
      */
     public static List<Broker> getBrokers(String key, BrokerConstants.PRIORITY_CHOICE priority_choice) {
@@ -362,7 +444,7 @@ public class CacheManager {
      * Get the broker with mentioned serverId handling given partition key
      */
     public static Broker getBroker(String key, String serverId) {
-        Broker broker = null;
+        Broker broker;
         brokerLock.readLock().lock();
 
         Brokers brokers = getBrokers(key);
@@ -384,5 +466,29 @@ public class CacheManager {
 
         brokerLock.readLock().unlock();
         return exist;
+    }
+
+    /**
+     * Get the heartbeat details for the given partition key and serverId
+     */
+    public static HeartBeatReceivedTime getHeartBeatReceivedTime(String key, String serverId) {
+        heartBeatLock.readLock().lock();
+
+        try {
+            return heartBeatReceivedTimes.get(key, serverId);
+        } finally {
+            heartBeatLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Add new heartbeat details for the given partition key and serverId
+     */
+    public static void createHeartBeatObject(String key, String serverId) {
+        heartBeatLock.writeLock().lock();
+
+        heartBeatReceivedTimes.add(key, serverId);
+
+        heartBeatLock.writeLock().unlock();
     }
 }

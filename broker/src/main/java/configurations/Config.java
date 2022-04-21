@@ -9,7 +9,6 @@ import models.Host;
  */
 public class Config {
     private Host local;
-    private Host heartBeatServer;
     private Host loadBalancer;
 
     /**
@@ -17,13 +16,6 @@ public class Config {
      */
     public Host getLocal() {
         return local;
-    }
-
-    /**
-     * @return Details of the host which is running locally to listen for heartbeat message
-     */
-    public Host getHeartBeatServer() {
-        return heartBeatServer;
     }
 
     /**

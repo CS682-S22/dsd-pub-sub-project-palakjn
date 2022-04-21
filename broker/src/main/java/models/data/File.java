@@ -92,6 +92,8 @@ public class File {
         segment.write(data);
         segment.addOffset(totalSize);
         offset = totalSize;
+        //TODO: Remove
+        logger.info(String.format("[%s] Offset after adding %d bytes of data is %d.", CacheManager.getBrokerInfo().getString(), data.length, offset));
         totalSize += data.length;
 
         if (segment.getNumOfLogs() == BrokerConstants.MAX_SEGMENT_MESSAGES) {
@@ -130,6 +132,7 @@ public class File {
         if (broker_state == BrokerConstants.BROKER_STATE.READY) {
             if (Objects.equals(dataPacket.getDataType(), BrokerConstants.DATA_TYPE.REPLICA_DATA)) {
                 logger.info(String.format("[%s:%d] Writing REPLICA data to segment for key %s", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), name));
+                System.out.printf("[%s:%d] Writing REPLICA data to segment for key %s%n", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), name);
                 write(dataPacket.getData(), false);
             } else {
                 logger.warn(String.format("[%s:%d] Not writing data to segment as received %s request type when the broker is in READY state for key %s.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), dataPacket.getDataType(), name));
@@ -138,9 +141,11 @@ public class File {
         } else if (broker_state == BrokerConstants.BROKER_STATE.SYNC) {
             if (Objects.equals(dataPacket.getDataType(), BrokerConstants.DATA_TYPE.REPLICA_DATA)) {
                 logger.info(String.format("[%s:%d] Writing the REPLICA data to local buffer as the broker state is SYNC for key %s.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), name));
+                System.out.printf("[%s:%d] Writing the REPLICA data to local buffer as the broker state is SYNC for key %s.%n", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), name);
                 writeToLocal(dataPacket.getData());
             } else if (Objects.equals(dataPacket.getDataType(), BrokerConstants.DATA_TYPE.CATCH_UP_DATA)) {
                 logger.info(String.format("[%s:%d] Writing the CATCH-UP data to segment as the broker state is SYNC for key %s.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), name));
+                System.out.printf("[%s:%d] Writing the CATCH-UP data to segment as the broker state is SYNC for key %s.%n", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), name);
                 write(dataPacket.getData(), false);
             } else {
                 logger.warn(String.format("[%s:%d] Not writing data to segment as received %s request type when the broker is in SYNC state for key %s.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), dataPacket.getDataType(), name));

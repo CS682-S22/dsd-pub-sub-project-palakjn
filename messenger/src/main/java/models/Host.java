@@ -17,14 +17,19 @@ public class Host extends Object {
     @Expose
     protected int port;
     @Expose
+    protected int heartBeatPort;
+    @Expose
     private int designation; // 0 for leader and 1 for follower
-    private int numberOfPartitions; // Number of partitions a corresponding broker holding. [Will be 0 for other type of hosts: producer/consumer/load balancer]
+    @Expose
     private String status; //ACTIVE or INACTIVE
 
-    public Host(int priorityNum, String address, int port) {
+    private int numberOfPartitions; // Number of partitions a corresponding broker holding. [Will be 0 for other type of hosts: producer/consumer/load balancer]
+
+    public Host(int priorityNum, String address, int port, int heartBeatPort) {
         this.priorityNum = priorityNum;
         this.address = address;
         this.port = port;
+        this.heartBeatPort = heartBeatPort;
         status = Constants.BROKER_STATUS.ACTIVE;
     }
 
@@ -38,6 +43,7 @@ public class Host extends Object {
          priorityNum = host.getPriorityNum();
          address = host.getAddress();
          port = host.getPort();
+         heartBeatPort = host.getHeartBeatPort();
          status = Constants.BROKER_STATUS.ACTIVE;
     }
 
@@ -95,6 +101,13 @@ public class Host extends Object {
     }
 
     /**
+     * Get the heartbeat port of the host
+     */
+    public int getHeartBeatPort() {
+        return heartBeatPort;
+    }
+
+    /**
      * Get whether the host is leader or follower
      */
     public int getDesignation() {
@@ -120,6 +133,13 @@ public class Host extends Object {
      */
     public String getString() {
         return String.format("%s:%d", address, port);
+    }
+
+    /**
+     * Get the address and heartbeat port as one string
+     */
+    public String getHeartBeatString() {
+        return String.format("%s:%d", address, heartBeatPort);
     }
 
     /**

@@ -64,6 +64,6 @@ public class DataPacket extends Object {
      * Determines whether the packet is valid
      */
     public boolean isValid() {
-        return !Strings.isNullOrEmpty(key) && !Strings.isNullOrEmpty(dataType) && data != null && toOffset > 0;
+        return !Strings.isNullOrEmpty(key) && !Strings.isNullOrEmpty(dataType) && data != null;
     }
 }

@@ -21,6 +21,7 @@ import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -122,6 +123,7 @@ public class Processor {
     private void produce(Config config, TopicConfig topicConfig) {
         String hostName = String.format("framework.Producer - %s", config.getHostName());
         logger.info(String.format("Started %s", hostName));
+        Scanner input = new Scanner(System.in);
 
         Properties properties = new Properties();
         properties.put(AppConstants.PROPERTY_KEY.LOADBALANCER, String.format("%s:%d", config.getLoadBalancer().getAddress(), config.getLoadBalancer().getPort()));
@@ -135,6 +137,9 @@ public class Processor {
             String line = reader.readLine();
 
             while (line != null) {
+                System.out.println("Enter to send new log to producer");
+                input.nextLine();
+
                 producer.send(topicConfig.getName(), topicConfig.getKey(), line.getBytes(StandardCharsets.UTF_8));
                 line = reader.readLine();
 

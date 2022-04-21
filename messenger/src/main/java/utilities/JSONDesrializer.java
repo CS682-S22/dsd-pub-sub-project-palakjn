@@ -44,14 +44,12 @@ public class JSONDesrializer {
     /**
      * Parse the body to get the request of class T
      * @param body JSON String in bytes
-     * @param classOfT Type of Class
      * @return Parsed object
      */
-    public static <T> Request<T> deserializeRequest(byte[] body, Class<T> classOfT) {
+    public static <T> Request<T> deserializeRequest(byte[] body, Type collectionType) {
         Gson gson = new Gson();
 
         Request<T> object = null;
-        Type collectionType = new TypeToken<Request<T>>(){}.getType();
 
         try {
             String json = new String(body);
@@ -67,14 +65,12 @@ public class JSONDesrializer {
     /**
      * Parse the body to get the response of class T
      * @param body JSON String in bytes
-     * @param classOfT Type of Class
      * @return Parsed object
      */
-    public static <T> Response<T> deserializeResponse(byte[] body, Class<T> classOfT) {
+    public static <T> Response<T> deserializeResponse(byte[] body, Type collectionType) {
         Gson gson = new Gson();
 
         Response<T> object = null;
-        Type collectionType = new TypeToken<Response<T>>(){}.getType();
 
         try {
             String json = new String(body);

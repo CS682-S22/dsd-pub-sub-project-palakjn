@@ -3,6 +3,7 @@ package utilities;
 import configuration.Constants;
 import models.JoinResponse;
 import models.Object;
+import models.responses.Response;
 
 /**
  * Responsible for creating packets to send to/for parsing packets which are received.
@@ -22,6 +23,8 @@ public class LBPacketHandler extends PacketHandler {
      * Create packet to send join response to the broker
      */
     public static byte[] createJoinResponse(int priorityNum) {
-        return createPacket(Constants.REQUESTER.LOAD_BALANCER, Constants.TYPE.RESP, new JoinResponse(priorityNum));
+        Response<JoinResponse> joinResponse = new Response<>(Constants.RESPONSE_STATUS.OK, new JoinResponse(priorityNum));
+
+        return createPacket(Constants.REQUESTER.LOAD_BALANCER, Constants.TYPE.RESP, joinResponse);
     }
 }

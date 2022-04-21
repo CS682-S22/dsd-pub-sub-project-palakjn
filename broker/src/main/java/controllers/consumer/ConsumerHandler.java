@@ -1,11 +1,13 @@
 package controllers.consumer;
 
+import com.google.gson.reflect.TypeToken;
 import configurations.BrokerConstants;
 import controllers.Connection;
 import controllers.DataTransfer;
 import controllers.HostService;
 import controllers.database.CacheManager;
 import models.Header;
+import models.Host;
 import models.requests.TopicReadWriteRequest;
 import models.requests.Request;
 import org.apache.logging.log4j.LogManager;
@@ -41,7 +43,7 @@ public class ConsumerHandler {
             if (header.getType() != BrokerConstants.TYPE.SUB.getValue() && header.getType() != BrokerConstants.TYPE.PULL.getValue()) {
                 logger.warn(String.format("[%s:%d] Received invalid request %s from the consumer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), BrokerConstants.findTypeByValue(header.getType()), connection.getDestinationIPAddress(), connection.getDestinationPort()));
             } else {
-                Request<TopicReadWriteRequest> request = JSONDesrializer.deserializeRequest(body, TopicReadWriteRequest.class);
+                Request<TopicReadWriteRequest> request = JSONDesrializer.deserializeRequest(body, new TypeToken<Request<TopicReadWriteRequest>>(){}.getType());
 
                 if (request != null && validateRequest(header, request.getRequest())) {
                     if (header.getType() == BrokerConstants.TYPE.PULL.getValue()) {
@@ -115,7 +117,7 @@ public class ConsumerHandler {
                     byte[] body = BrokerPacketHandler.getData(packet);
 
                     if (body != null) {
-                        Request<TopicReadWriteRequest> request = JSONDesrializer.deserializeRequest(body, TopicReadWriteRequest.class);
+                        Request<TopicReadWriteRequest> request = JSONDesrializer.deserializeRequest(body, new TypeToken<Request<TopicReadWriteRequest>>(){}.getType());
 
                         if (request != null && validateRequest(header, request.getRequest())) {
                             readTopicRequest = request.getRequest();

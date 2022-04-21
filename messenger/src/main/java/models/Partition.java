@@ -32,6 +32,7 @@ public class Partition extends Object {
         this.topicName = topicName;
         this.number = number;
         this.leader = leader;
+        this.brokers = new ArrayList<>();
     }
 
     /**
@@ -77,9 +78,7 @@ public class Partition extends Object {
         stringBuilder.append(String.format("Leader: %s", leader.getString()));
 
         for (Host broker : brokers) {
-            if (!broker.isLeader()) {
-                stringBuilder.append(String.format(", Follower: %s", broker.getString()));
-            }
+            stringBuilder.append(String.format(", Broker: %s", broker.getString()));
         }
 
         return stringBuilder.toString();
@@ -89,7 +88,7 @@ public class Partition extends Object {
      * Add the broker to the list
      */
     public void addBroker(Host broker) {
-        brokers.add(new Host(broker.getAddress(), broker.getPort()));
+        brokers.add(new Host(broker.getPriorityNum(), broker.getAddress(), broker.getPort(), broker.getHeartBeatPort()));
     }
 
     /**
@@ -124,7 +123,7 @@ public class Partition extends Object {
      */
     public void removeLeader() {
         leader.setInActive();
-        brokers.removeIf(broker -> broker.getDesignation() == Constants.BROKER_DESIGNATION.LEADER.getValue());
+        brokers.removeIf(broker -> broker.getAddress().equals(leader.getAddress()) && broker.getPort() == leader.getPort());
     }
 
     /**

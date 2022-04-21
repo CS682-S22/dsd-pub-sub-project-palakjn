@@ -26,6 +26,8 @@ public class HeartBeatSender {
      * Schedule the task to send heartbeat messages at a fixed interval
      */
     public boolean send(HeartBeatRequest request) {
+
+        logger.info(String.format("[%s] Making connection with the host %s.", CacheManager.getBrokerInfo().getString(), request.getReceivedId()));
         Connection connection = connect(request.getReceivedId());
 
         if (connection != null) {

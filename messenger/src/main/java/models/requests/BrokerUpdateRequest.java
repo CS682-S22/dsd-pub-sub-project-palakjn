@@ -22,6 +22,7 @@ public class BrokerUpdateRequest {
     public BrokerUpdateRequest(String key, Host broker) {
         String[] parts = key.split(":");
         this.topic = parts[0];
+        this.key = key;
         this.partition = Integer.parseInt(parts[1]);
         this.broker = broker;
     }

@@ -1,5 +1,6 @@
 package controllers.broker;
 
+import com.google.gson.reflect.TypeToken;
 import configurations.BrokerConstants;
 import controllers.*;
 import controllers.database.CacheManager;
@@ -9,7 +10,6 @@ import controllers.heartbeat.HeartBeatSender;
 import controllers.replication.SyncManager;
 import models.Header;
 import models.data.File;
-import models.heartbeat.HeartBeatRequest;
 import models.requests.BrokerUpdateRequest;
 import models.requests.Request;
 import models.requests.TopicReadWriteRequest;
@@ -79,7 +79,7 @@ public class BrokerHandler {
         byte[] data = BrokerPacketHandler.getData(message);
 
         if (data != null) {
-            Request<BrokerUpdateRequest> brokerUpdateRequest = JSONDesrializer.deserializeRequest(data, BrokerUpdateRequest.class);
+            Request<BrokerUpdateRequest> brokerUpdateRequest = JSONDesrializer.deserializeRequest(data, new TypeToken<Request<BrokerUpdateRequest>>(){}.getType());
 
             if (brokerUpdateRequest != null && brokerUpdateRequest.getRequest() != null) {
                 if (Objects.equals(brokerUpdateRequest.getType(), BrokerConstants.REQUEST_TYPE.LEADER)) {
@@ -87,9 +87,9 @@ public class BrokerHandler {
                     CacheManager.setLeader(brokerUpdateRequest.getRequest().getKey(), new Broker(brokerUpdateRequest.getRequest().getBroker()));
                     hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER);
 
-                    //Start sending heartbeat messages to another brokers
-                    HeartBeatRequest heartBeatRequest = new HeartBeatRequest(brokerUpdateRequest.getRequest().getKey(), CacheManager.getBrokerInfo().getString(), brokerUpdateRequest.getRequest().getBroker().getString());
-                    heartBeatSender.send(heartBeatRequest);
+                    logger.info(String.format("[%s] The membership table for the partition of the topic %s after new leader is %s.", CacheManager.getBrokerInfo(), brokerUpdateRequest.getRequest().getKey(), CacheManager.getMemberShipTable(brokerUpdateRequest.getRequest().getKey())));
+                    System.out.printf("[%s] The membership table for the partition of the topic %s after new leader is %s.%n", CacheManager.getBrokerInfo(), brokerUpdateRequest.getRequest().getKey(), CacheManager.getMemberShipTable(brokerUpdateRequest.getRequest().getKey()));
+
                     syncManager.sync(brokerUpdateRequest.getRequest().getKey());
                 } else {
                     logger.warn(String.format("[%s] Receive unsupported broker update request packet %s.", CacheManager.getBrokerInfo().getString(), brokerUpdateRequest.getType()));
@@ -105,7 +105,7 @@ public class BrokerHandler {
         byte[] data = BrokerPacketHandler.getData(message);
 
         if (data != null) {
-            Request<OffsetRequest> request = JSONDesrializer.deserializeRequest(data, OffsetRequest.class);
+            Request<OffsetRequest> request = JSONDesrializer.deserializeRequest(data, new TypeToken<Request<OffsetRequest>>(){}.getType());
 
             if (request != null && request.getRequest() != null && request.getRequest().isValid()) {
                 if (request.getType().equalsIgnoreCase(BrokerConstants.REQUEST_TYPE.OFFSET)) {
@@ -127,6 +127,10 @@ public class BrokerHandler {
                 }
             } else {
                 logger.info(String.format("[%s] Received invalid REQ request", CacheManager.getBrokerInfo().getString()));
+
+                if (request != null) {
+                    logger.info("Received request type is: " + request.getType());
+                }
             }
         }
     }
@@ -138,7 +142,7 @@ public class BrokerHandler {
         byte[] data = BrokerPacketHandler.getData(message);
 
         if (data != null) {
-            Request<TopicReadWriteRequest> request = JSONDesrializer.deserializeRequest(data, TopicReadWriteRequest.class);
+            Request<TopicReadWriteRequest> request = JSONDesrializer.deserializeRequest(data, new TypeToken<Request<TopicReadWriteRequest>>(){}.getType());
 
             if (request != null && request.getRequest() != null && request.getRequest().isValid()) {
                 TopicReadWriteRequest topicReadWriteRequest = request.getRequest();
@@ -158,10 +162,9 @@ public class BrokerHandler {
         byte[] data = BrokerPacketHandler.getData(message);
 
         if (data != null) {
-            Request<DataPacket> request = JSONDesrializer.deserializeRequest(data, DataPacket.class);
+            DataPacket dataPacket = JSONDesrializer.fromJson(data, DataPacket.class);
 
-            if (request != null && request.getRequest() != null && request.getRequest().isValid()) {
-                DataPacket dataPacket = request.getRequest();
+            if (dataPacket != null && dataPacket.isValid()) {
                 logger.info(String.format("[%s] Received DATA packet [%s] for the partition key %s from another broker", CacheManager.getBrokerInfo().getString(), dataPacket.getDataType(), dataPacket.getKey()));
                 File partition = CacheManager.getPartition(dataPacket.getKey());
 
@@ -192,7 +195,11 @@ public class BrokerHandler {
                     logger.info(String.format("[%s] Unable to write the received data as broker not handling the partition %s. Sending NACK", CacheManager.getBrokerInfo().getString(), dataPacket.getKey()));
                     hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER);
                 }
+            } else {
+                logger.warn(String.format("[%s] Received invalid request from another broker.", CacheManager.getBrokerInfo().getString()));
             }
+        } else {
+            logger.warn(String.format("[%s] Received no data from another broker.", CacheManager.getBrokerInfo().getString()));
         }
     }
 

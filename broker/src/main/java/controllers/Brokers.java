@@ -1,7 +1,6 @@
 package controllers;
 
 import configurations.BrokerConstants;
-import controllers.Broker;
 import models.Host;
 
 import java.util.ArrayList;
@@ -19,6 +18,15 @@ public class Brokers {
 
     public Brokers() {
         brokers = new ArrayList<>();
+        lock = new ReentrantReadWriteLock();
+    }
+
+    public Brokers(List<Host> brokers) {
+        this.brokers = new ArrayList<>();
+        for (Host host : brokers) {
+            this.brokers.add(new Broker(host));
+        }
+
         lock = new ReentrantReadWriteLock();
     }
 
@@ -42,7 +50,7 @@ public class Brokers {
         if (brokers.size() > 0 && contains(host)) {
             Broker broker = getBroker(host);
             broker.close();
-            brokers.remove(broker);
+            brokers.removeIf(broker1 -> host.getAddress().equals(broker1.getAddress()) && host.getPort() == broker1.getPort());
         }
 
         lock.writeLock().unlock();
@@ -65,13 +73,17 @@ public class Brokers {
      * Get the broker
      */
     public Broker getBroker(Host host) {
+        Broker broker = null;
         lock.readLock().lock();
 
-        try {
-            return (Broker) brokers.stream().filter(broker -> broker.getAddress().equals(host.getAddress()) && broker.getPort() == host.getPort());
-        } finally {
-            lock.readLock().unlock();
+        for (Broker bro : brokers) {
+            if (bro.equals(host)) {
+                broker = new Broker(bro);
+            }
         }
+
+        lock.readLock().unlock();
+        return broker;
     }
 
     /**

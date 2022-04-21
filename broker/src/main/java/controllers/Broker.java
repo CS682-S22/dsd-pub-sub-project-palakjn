@@ -120,8 +120,9 @@ public class Broker extends Host {
      */
     public void close() {
         Connection connection = Channels.get(getString(), BrokerConstants.CHANNEL_TYPE.DATA);
-        connection.closeConnection();
-
-        Channels.remove(getString(), BrokerConstants.CHANNEL_TYPE.DATA);
+        if (connection != null) {
+            connection.closeConnection();
+            Channels.remove(getString(), BrokerConstants.CHANNEL_TYPE.DATA);
+        }
     }
 }
