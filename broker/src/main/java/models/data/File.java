@@ -92,7 +92,7 @@ public class File {
         segment.write(data);
         segment.addOffset(totalSize);
         offset = totalSize;
-        //TODO: Remove
+
         logger.info(String.format("[%s] Offset after adding %d bytes of data is %d.", CacheManager.getBrokerInfo().getString(), data.length, offset));
         totalSize += data.length;
 
@@ -123,7 +123,7 @@ public class File {
     /**
      * Write the data received from another broker to local segment based on the current broker status for the partition
      */
-    public boolean write(DataPacket dataPacket) {
+    public boolean write(DataPacket dataPacket, int nextOffset) {
         boolean isWritten = true;
         lock.writeLock().lock();
 
@@ -144,9 +144,13 @@ public class File {
                 System.out.printf("[%s:%d] Writing the REPLICA data to local buffer as the broker state is SYNC for key %s.%n", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), name);
                 writeToLocal(dataPacket.getData());
             } else if (Objects.equals(dataPacket.getDataType(), BrokerConstants.DATA_TYPE.CATCH_UP_DATA)) {
-                logger.info(String.format("[%s:%d] Writing the CATCH-UP data to segment as the broker state is SYNC for key %s.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), name));
-                System.out.printf("[%s:%d] Writing the CATCH-UP data to segment as the broker state is SYNC for key %s.%n", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), name);
-                write(dataPacket.getData(), false);
+                if (totalSize == nextOffset) {
+                    logger.info(String.format("[%s] Received duplicate CATCHUP data. Ignoring data of size %d. Current Offset: %d. Next Offset To read: %d", CacheManager.getBrokerInfo().getString(), dataPacket.getData().length, offset, totalSize));
+                } else {
+                    logger.info(String.format("[%s:%d] Writing the CATCH-UP data to segment as the broker state is SYNC for key %s.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), name));
+                    System.out.printf("[%s:%d] Writing the CATCH-UP data to segment as the broker state is SYNC for key %s.%n", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), name);
+                    write(dataPacket.getData(), false);
+                }
             } else {
                 logger.warn(String.format("[%s:%d] Not writing data to segment as received %s request type when the broker is in SYNC state for key %s.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), dataPacket.getDataType(), name));
                 isWritten = false;
@@ -211,8 +215,6 @@ public class File {
         lock.readLock().lock();
         int segmentNumber = -1;
 
-        //TODO: remove
-        logger.debug(String.format("[%s] Offset is %d and available size is %d. Current segment size is %d. IsSync: %b", CacheManager.getBrokerInfo().getString(), offset, availableSize, segment.getAvailableSize(), isSync));
         if (offset < availableSize) {
             for (Segment seg : segments) {
                 if (offset < seg.getAvailableSize() && seg.isOffsetExist(offset)) {

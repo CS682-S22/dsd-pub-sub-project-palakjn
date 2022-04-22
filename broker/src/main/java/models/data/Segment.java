@@ -72,16 +72,6 @@ public class Segment {
      * Checks if the given offset exists
      */
     public boolean isOffsetExist(int offset) {
-        //TODO: Remove
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append(String.format("[%s] The segment %d has offsets: ", CacheManager.getBrokerInfo().getString(), segment));
-
-        for (int off : offsets) {
-            stringBuilder.append(off).append(", ");
-        }
-
-        logger.debug(stringBuilder.toString());
-
         return offsets.contains(offset);
     }
 

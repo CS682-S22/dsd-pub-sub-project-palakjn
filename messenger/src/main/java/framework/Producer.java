@@ -62,8 +62,6 @@ public class Producer extends Client {
 
                 if (data != null) {
 
-                    //TODO: Remove
-                    logger.info("Creating data packet with sequence number " + seqNum);
                     byte[] dataPacket = PacketHandler.createDataPacket(Constants.REQUESTER.PRODUCER, data, seqNum);
 
                     while (running && connection.isOpen()) {

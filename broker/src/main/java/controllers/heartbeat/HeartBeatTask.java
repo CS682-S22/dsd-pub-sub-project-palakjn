@@ -30,8 +30,6 @@ public class HeartBeatTask implements Runnable {
             byte[] packet = BrokerPacketHandler.createHeartBeatPacket(request);
             connection.send(packet);
         } else {
-            //TODO:Remove
-            logger.info(String.format("[%s] Cancelling task HeartBeatSend_%s_%s as the connection is being closed with the server.", CacheManager.getBrokerInfo().getString(), request.getKey(), request.getReceivedId()));
             HeartBeatSchedular.cancel(String.format("HeartBeatSend_%s_%s", request.getKey(), request.getReceivedId()));
             Channels.remove(request.getReceivedId(), BrokerConstants.CHANNEL_TYPE.HEARTBEAT);
         }

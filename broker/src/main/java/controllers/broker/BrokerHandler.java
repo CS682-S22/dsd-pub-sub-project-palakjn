@@ -68,7 +68,7 @@ public class BrokerHandler {
             processPullRequest(message);
         } else if (header.getType() == BrokerConstants.TYPE.DATA.getValue()) {
             logger.info(String.format("[%s] Received \"DATA\" request from broker.", CacheManager.getBrokerInfo().getString()));
-            processDataRequest(message);
+            processDataRequest(header.getOffset(), message);
         }
     }
 
@@ -165,7 +165,7 @@ public class BrokerHandler {
     /**
      * Process requests from broker with header type as DATA (Receive data, etc.)
      */
-    private void processDataRequest(byte[] message) {
+    private void processDataRequest(int nextOffset, byte[] message) {
         byte[] data = BrokerPacketHandler.getData(message);
 
         if (data != null) {
@@ -176,7 +176,7 @@ public class BrokerHandler {
                 File partition = CacheManager.getPartition(dataPacket.getKey());
 
                 if (partition != null) {
-                    boolean isSuccess = partition.write(dataPacket);
+                    boolean isSuccess = partition.write(dataPacket, nextOffset);
 
                     if (isSuccess) {
                         logger.info(String.format("[%s] Sending ACK to the broker as written %s type data to local for the partition %s", CacheManager.getBrokerInfo().getString(), dataPacket.getDataType(), dataPacket.getKey()));

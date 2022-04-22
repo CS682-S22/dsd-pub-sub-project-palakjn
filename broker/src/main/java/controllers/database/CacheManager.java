@@ -159,9 +159,6 @@ public class CacheManager {
 
         File partition = getPartition(key);
 
-        //TODO: Remove
-        logger.info("Updated partition with the offset as " + partition.getOffset() + " and total size as " + partition.getTotalSize());
-
         topicLock.writeLock().unlock();
     }
 
@@ -305,14 +302,6 @@ public class CacheManager {
 
         if (leader != null) {
             isEqual = leader.isSame(host);
-
-            if (!isEqual) {
-                //TODO: Remove
-                logger.info("[" + broker.getString() + "] Broker " + host.getString() + " is not the leader of topic " + key + " Leader is: " + leader.getString());
-            }
-        } else {
-            //TODO: Remove
-            logger.info("[" + broker.getString() + "] No leader info found");
         }
 
         leadersLock.readLock().unlock();

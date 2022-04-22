@@ -1,6 +1,5 @@
 package utilities;
 
-import configuration.Constants;
 import configurations.BrokerConstants;
 import models.Host;
 import models.election.ElectionRequest;
@@ -113,7 +112,7 @@ public class BrokerPacketHandler extends PacketHandler {
      * Create the request to get the data from the broker from the given fromOffset
      */
     public static byte[] createGetDataRequest(String key, String receiver, int fromOffset, int toOffset) {
-        String parts[] = key.split(":");
+        String[] parts = key.split(":");
         TopicReadWriteRequest topicReadWriteRequest = new TopicReadWriteRequest(parts[0], Integer.parseInt(parts[1]), fromOffset);
         topicReadWriteRequest.setToOffset(toOffset);
         topicReadWriteRequest.setReceiver(receiver);
@@ -125,10 +124,10 @@ public class BrokerPacketHandler extends PacketHandler {
     /**
      * Create the packet to contain the data packet to send to broker
      */
-    public static byte[] createDataPacket(String key, String type, byte[] data, int toOffset) {
+    public static byte[] createDataPacket(String key, String type, byte[] data, int toOffset, int nextOffset) {
         DataPacket dataPacket = new DataPacket(key, type, data, toOffset);
 
-        return createPacket(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.DATA, dataPacket);
+        return createPacketWithOffset(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.DATA, dataPacket, nextOffset);
     }
 
     /**

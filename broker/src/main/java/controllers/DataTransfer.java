@@ -105,7 +105,6 @@ public class DataTransfer {
         int count = 0;
         int offset;
 
-        //TODO: Remove
         logger.debug(String.format("[%s] Sending data from %d segments.", CacheManager.getBrokerInfo().getString(), segments.size()));
 
         for (Segment segment : segments) {
@@ -120,12 +119,10 @@ public class DataTransfer {
 
                 if (method == BrokerConstants.METHOD.SYNC && segment.getSegment() == toSegmentNumber && offsetIndex > segment.getOffsetIndex(request.getToOffset())) {
                     //Have to send only within the range during sync process
-                    //TODO: REMOVE
                     logger.debug(String.format("[%s] Not sending offset %d as offsetIndex %d exceed toOffset %d when the segment number is %d", CacheManager.getBrokerInfo().getString(), segment.getOffset(offsetIndex), offsetIndex, segment.getOffsetIndex(request.getToOffset()), toSegmentNumber));
                     break;
                 }
 
-                //TODO: Remove
                 logger.debug(String.format("[%s] Sending data with offset %d from segment %d.", CacheManager.getBrokerInfo().getString(), segment.getOffset(offsetIndex), segment.getSegment()));
 
                 offset = segment.getOffset(offsetIndex) - segment.getOffset(0);
@@ -172,7 +169,7 @@ public class DataTransfer {
 
         if (data != null) {
             send(key, data, nextOffset, toOffset);
-            logger.info(String.format("[%s] [%s] Send %d number of bytes to the consumer/broker %s:%d", CacheManager.getBrokerInfo().getString(), method.name(), data.length, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+            logger.info(String.format("[%s] [%s] Send %d number of bytes to the consumer/broker with next offset as %d", CacheManager.getBrokerInfo().getString(), method.name(), data.length, nextOffset));
         }
     }
 
@@ -185,7 +182,7 @@ public class DataTransfer {
         } else if (method == BrokerConstants.METHOD.PUSH) {
             subscriber.onEvent(data);
         } else if (method == BrokerConstants.METHOD.SYNC) {
-            byte[] dataPacket = BrokerPacketHandler.createDataPacket(key, BrokerConstants.DATA_TYPE.CATCH_UP_DATA, data, toOffset);
+            byte[] dataPacket = BrokerPacketHandler.createDataPacket(key, BrokerConstants.DATA_TYPE.CATCH_UP_DATA, data, toOffset, nextOffset);
 
             Broker broker = CacheManager.getBroker(key, receiver);
             if (broker != null) {

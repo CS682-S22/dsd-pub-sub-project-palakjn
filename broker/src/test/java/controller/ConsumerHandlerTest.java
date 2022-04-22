@@ -21,30 +21,7 @@ import java.util.List;
  */
 public class ConsumerHandlerTest {
 
-    /**
-     * Test whether getSegmentNumber() returns the segment number if exact given offset exist
-     */
-    @Test
-    public void getSegmentNumber_exactOffset_returnSegment() {
-        TopicReadWriteRequest request = new TopicReadWriteRequest("topic", 1, 0, 15);
-        File partition = new File("topic", 1);
 
-        setup(partition);
-
-        ConsumerHandler consumerHandler = new ConsumerHandler(null);
-        int actual = -1;
-
-        try {
-            Method processMethod = ConsumerHandler.class.getDeclaredMethod("getSegmentNumber", TopicReadWriteRequest.class, File.class);
-            processMethod.setAccessible(true);
-            actual = (int) processMethod.invoke(consumerHandler, request, partition);
-
-        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException exception) {
-            System.err.println(exception.getMessage());
-        }
-
-        Assertions.assertEquals(0, actual);
-    }
 
     /**
      * Test whether getSegmentNumber return the segment number if the exact offset don't exist but the offset which is less
