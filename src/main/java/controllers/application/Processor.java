@@ -137,8 +137,10 @@ public class Processor {
             String line = reader.readLine();
 
             while (line != null) {
-                System.out.println("Enter to send new log to producer");
-                input.nextLine();
+                if (config.doPublishPerEnter()) {
+                    System.out.println("Enter to send new log to producer");
+                    input.nextLine();
+                }
 
                 producer.send(topicConfig.getName(), topicConfig.getKey(), line.getBytes(StandardCharsets.UTF_8));
                 line = reader.readLine();
@@ -172,25 +174,24 @@ public class Processor {
         properties.put(AppConstants.PROPERTY_KEY.HOST_NAME, hostName);
 
         Consumer consumer = new Consumer(properties);
+        consumer.subscribe(topicConfig.getName(), topicConfig.getKey());
 
         //Subscribing to the topic
-        if (consumer.subscribe(topicConfig.getName(), topicConfig.getKey())) {
-            String fileLocation = String.format("%s/%s_%d.log", topicConfig.getLocation(), topicConfig.getName(), topicConfig.getKey());
+        String fileLocation = String.format("%s/%s_%d.log", topicConfig.getLocation(), topicConfig.getName(), topicConfig.getKey());
 
-            try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileLocation, true))) {
-                while (true) {
-                    byte[] data = consumer.poll(AppConstants.WAIT_TIME);
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileLocation, true))) {
+            while (true) {
+                byte[] data = consumer.poll(AppConstants.WAIT_TIME);
 
-                    if (data != null) {
-                        String string = new String(data);
-                        writer.write(string);
-                        writer.newLine();
-                        writer.flush();
-                    }
+                if (data != null) {
+                    String string = new String(data);
+                    writer.write(string);
+                    writer.newLine();
+                    writer.flush();
                 }
-            } catch (IOException exception) {
-                logger.error(String.format("[%s] Unable to open/create the file at the location %s.", hostName, fileLocation), exception);
             }
+        } catch (IOException exception) {
+            logger.error(String.format("[%s] Unable to open/create the file at the location %s.", hostName, fileLocation), exception);
         }
     }
 }

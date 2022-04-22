@@ -19,6 +19,7 @@ public class Config {
     private List<TopicConfig> topics;
     private int method;
     private String hostName;
+    private boolean publishPerEnter;
 
     /**
      * Get the load balancer host info
@@ -74,5 +75,12 @@ public class Config {
      */
     public String getHostName() {
         return hostName;
+    }
+
+    /**
+     * Get the flag to indicate whether to publish log line after enter
+     */
+    public boolean doPublishPerEnter() {
+        return publishPerEnter;
     }
 }

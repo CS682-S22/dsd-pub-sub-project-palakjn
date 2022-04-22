@@ -3,6 +3,7 @@ package framework;
 import configuration.Constants;
 import controllers.Client;
 import models.Header;
+import models.Host;
 import models.Properties;
 import org.apache.logging.log4j.LogManager;
 import utilities.NodeTimer;
@@ -53,38 +54,18 @@ public class Consumer extends Client {
     /**
      * Subscribe the topic and partition with the broker.
      */
-    public boolean subscribe(String topic, int key) {
-        boolean flag = false;
-        byte[] lbPacket = PacketHandler.createGetBrokerReq(Constants.REQUESTER.CONSUMER, topic, key);
-        byte[] brokerRequest;
+    public void subscribe(String topic, int key) {
+        this.topic = topic;
+        this.key = key;
+        sendRequest();
+
+        logger.info(String.format("[%s] [%s] Successfully subscribed to the topic: %s - Partition %d.", hostName, method.name(), topic, key));
 
         if (method == Constants.METHOD.PULL) {
-            brokerRequest = PacketHandler.createToBrokerRequest(Constants.REQUESTER.CONSUMER, Constants.TYPE.PULL, topic, key, offset, Constants.CONSUMER_MAX_PULL_SIZE);
-        } else { //POST
-            brokerRequest = PacketHandler.createToBrokerRequest(Constants.REQUESTER.CONSUMER, Constants.TYPE.SUB, topic, key, offset);
-        }
-
-        //Get the broker and connect to the broker
-        if ((broker != null ||
-                getBroker(lbPacket, topic, key)) && connectToBroker(brokerRequest)) {
-            this.topic = topic;
-            this.key = key;
-            isConnected = true;
-            flag = true;
-
-            logger.info(String.format("[%s] [%s] Successfully subscribed to the topic: %s - Partition %d.", hostName, method.name(), topic, key));
-
-            if (method == Constants.METHOD.PULL) {
-                timer.startTimer("CONSUMER PULL TIMER", Constants.CONSUMER_WAIT_TIME);
-                threadPool.execute(this::processPULL);
-            } else {
-                threadPool.execute(this::processPUSH);
-            }
+            threadPool.execute(this::processPULL);
         } else {
-            logger.warn(String.format("[%s] [%s:%d] Either broker details not found or not able to connect to the broker. Not able to get the data of the topic %s - Partition %d.", hostName, broker == null ? null : broker.getAddress(), broker == null ? 0 : broker.getPort(), topic, key));
+            threadPool.execute(this::processPUSH);
         }
-
-        return flag;
     }
 
     /**
@@ -115,14 +96,14 @@ public class Consumer extends Client {
 
                 logger.info(String.format("[%s] Timeout happen. Received %d number of logs. Sending PULL request to broker to get topic %s:%d information from offset %d", hostName, count, topic, key, offset));
                 //Sending the pull request to the broker with new offset
-                sendPULLRequest();
+                sendRequest();
                 count = 0;
             } else if (count == Constants.CONSUMER_MAX_PULL_SIZE) {
                 timer.stopTimer();
 
                 logger.debug(String.format("[%s]  Received %d number of logs. Sending pull request to broker to get topic %s:%d information from offset %d", hostName, count, topic, key, offset));
                 //Sending the pull request to the broker with new offset
-                sendPULLRequest();
+                sendRequest();
                 count = 0;
             } else if (connection.isAvailable()) {
                 byte[] data = connection.receive();
@@ -147,15 +128,44 @@ public class Consumer extends Client {
     /**
      * Send pull request to the broker to get n number of data from the given offset
      */
-    private void sendPULLRequest() {
-        byte[] request = PacketHandler.createToBrokerRequest(Constants.REQUESTER.CONSUMER, Constants.TYPE.PULL, topic, key, offset, Constants.CONSUMER_MAX_PULL_SIZE);
-        if (connectToBroker(request)) {
-            timer.startTimer("CONSUMER PULL TIMER", Constants.CONSUMER_WAIT_TIME);
-            isConnected = true;
-        } else {
-            logger.warn(String.format("[%s] Not able to connect to the broker to get topic %s:%d offset: %d information", hostName, topic, key, offset));
-            isConnected = false;
+    private void sendRequest() {
+        Host oldBroker = broker == null ? null : new Host(broker);
+        broker = null;
+
+        while (!getBrokerAndConnect()) {
+            logger.warn(String.format("[%s] Fail to connect with the broker %s. Might be failed. Sleeping for %d amount of time before retrying", hostName, oldBroker == null ? "" : oldBroker.getString(), Constants.PRODUCER_SLEEP_TIME));
+
+            try {
+                Thread.sleep(Constants.PRODUCER_SLEEP_TIME);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            broker = null;
         }
+
+        if (method == Constants.METHOD.PULL) {
+            timer.startTimer("CONSUMER PULL TIMER", Constants.CONSUMER_WAIT_TIME);
+        }
+
+        isConnected = true;
+    }
+
+    /**
+     * Get broker information from load balancer and connect to it.
+     */
+    private boolean getBrokerAndConnect() {
+        byte[] lbPacket = PacketHandler.createGetBrokerReq(Constants.REQUESTER.CONSUMER, topic, key);
+        byte[] brokerRequest;
+
+        if (method == Constants.METHOD.PULL) {
+            brokerRequest = PacketHandler.createToBrokerRequest(Constants.REQUESTER.CONSUMER, Constants.TYPE.PULL, topic, key, offset, Constants.CONSUMER_MAX_PULL_SIZE);
+        } else { //POST
+            brokerRequest = PacketHandler.createToBrokerRequest(Constants.REQUESTER.CONSUMER, Constants.TYPE.SUB, topic, key, offset);
+        }
+
+        return (broker != null ||
+                getBroker(lbPacket, topic, key)) && connectToBroker(brokerRequest);
     }
 
     /**

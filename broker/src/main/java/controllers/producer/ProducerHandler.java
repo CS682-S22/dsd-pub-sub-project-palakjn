@@ -110,7 +110,7 @@ public class ProducerHandler {
                                     logger.warn(String.format("[%s:%d] Received empty data %d from producer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), seqNum, connection.getDestinationIPAddress(), connection.getDestinationPort()));
                                 }
                             } else {
-                                logger.info(String.format("[%s:%d] Broker is in %s state. Not accepting new data from producer %s:%d. Sending NACK.", connection.getSourceIPAddress(), connection.getSourcePort(), broker_state.name(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                                logger.info(String.format("[%s] Broker is in %s state. Not accepting new data from producer %s:%d. Sending NACK.", CacheManager.getBrokerInfo().getString(), broker_state.name(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
                                 hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
                             }
                         } else if (header.getSeqNum() < seqNum) {

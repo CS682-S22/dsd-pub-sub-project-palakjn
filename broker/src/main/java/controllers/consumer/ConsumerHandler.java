@@ -47,8 +47,14 @@ public class ConsumerHandler {
 
                 if (request != null && validateRequest(header, request.getRequest())) {
                     if (header.getType() == BrokerConstants.TYPE.PULL.getValue()) {
-                        dataTransfer.setMethod(BrokerConstants.METHOD.PULL);
-                        processPullRequest(request.getRequest());
+                        BrokerConstants.BROKER_STATE broker_state = CacheManager.getStatus(String.format("%s:%d", request.getRequest().getName(), request.getRequest().getPartition()));
+
+                        if (broker_state == BrokerConstants.BROKER_STATE.READY) {
+                            dataTransfer.setMethod(BrokerConstants.METHOD.PULL);
+                            processPullRequest(request.getRequest());
+                        } else {
+                            logger.info(String.format("[%s] Broker is in %s state. Not sending any data to %s:%d. ", CacheManager.getBrokerInfo().getString(), broker_state.name(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                        }
 
                         connection.closeConnection();
                     } else {
