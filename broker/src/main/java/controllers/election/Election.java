@@ -42,6 +42,8 @@ public class Election {
         BrokerConstants.BROKER_STATE broker_state = CacheManager.getStatus(key);
 
         if (broker_state != BrokerConstants.BROKER_STATE.ELECTION) {
+            System.out.printf("[%s] Starting election for partition %s.\n", CacheManager.getBrokerInfo().getString(), key);
+
             //Change the broker state to "Election"
             CacheManager.setStatus(key, BrokerConstants.BROKER_STATE.ELECTION);
 
@@ -97,6 +99,8 @@ public class Election {
 
                 //Sending "I am leader" message to other brokers and load balancer
                 sendLeaderUpdate(key);
+
+                System.out.printf("[%s] I am the new leader. Membership table for partition %s: %s.\n", CacheManager.getBrokerInfo().getString(), key, CacheManager.getMemberShipTable(key));
 
                 //Set the broker instance to "Sync"
                 syncManager.sync(key);
@@ -165,6 +169,7 @@ public class Election {
 
         if (leader != null && leader.isActive()) {
             logger.info(String.format("[%s:%d] New leader %s:%d is being elected for the partition %s.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), leader.getAddress(), leader.getPort(), key));
+            System.out.printf("[%s] Broker %s become the leader.\n", CacheManager.getBrokerInfo().getString(), leader.getString());
             syncManager.sync(key);
         } else {
             logger.warn(String.format("[%s:%d] No new leader being chosen for the topic %s. Starting election again.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), key));
