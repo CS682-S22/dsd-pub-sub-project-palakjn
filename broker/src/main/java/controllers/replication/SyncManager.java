@@ -66,7 +66,7 @@ public class SyncManager {
         //Get the followers holding the partition key
         Brokers brokers = CacheManager.getBrokers(key);
 
-        if (brokers != null) {
+        if (brokers != null && brokers.getSize() > 0) {
             List<Broker> brokerList = brokers.getBrokers();
 
             List<OffsetResponse> offsetResponseList = new ArrayList<>();

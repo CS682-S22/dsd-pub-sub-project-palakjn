@@ -221,7 +221,6 @@ public class BrokerHandler {
         Brokers brokers = CacheManager.getBrokers(key);
         outOfSyncBrokers = brokers.getOutOfSyncBrokers();
 
-
         return outOfSyncBrokers;
     }
 

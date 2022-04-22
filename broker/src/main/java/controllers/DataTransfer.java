@@ -86,7 +86,7 @@ public class DataTransfer {
                 }
 
                 //Getting again segment number with new rounded offset
-                segmentNumber = partition.getSegmentNumber(offset, method == BrokerConstants.METHOD.SYNC);
+                segmentNumber = partition.getSegmentNumber(roundUpOffset, method == BrokerConstants.METHOD.SYNC);
             } else {
                 logger.warn(String.format("[%s:%d] [%s] No offset %d found for the topic %s - partition %d information.", connection.getDestinationIPAddress(), connection.getDestinationPort(), method != null ? method.name() : null, offset, request.getName(), request.getPartition()));
             }

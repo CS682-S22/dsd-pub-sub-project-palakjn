@@ -2,10 +2,14 @@ package controller;
 
 import configurations.BrokerConstants;
 import controllers.Connection;
+import controllers.database.CacheManager;
 import controllers.producer.ProducerHandler;
+import models.Host;
 import models.data.File;
 import models.data.Segment;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import utilities.BrokerPacketHandler;
 
@@ -25,6 +29,12 @@ import java.util.List;
  * @author Palak Jain
  */
 public class ProducerHandlerTest {
+
+    @BeforeAll
+    public static void init() {
+        CacheManager.setBroker(new Host("Sample", 1));
+        CacheManager.setStatus("topic:1", BrokerConstants.BROKER_STATE.READY);
+    }
 
     /**
      * Test whether receive() method append new date to the current segment or not
@@ -138,12 +148,18 @@ public class ProducerHandlerTest {
         ProducerHandler handler = new ProducerHandler(connection);
 
         try {
-            Method processMethod = ProducerHandler.class.getDeclaredMethod("receive", File.class);
+            Method processMethod = ProducerHandler.class.getDeclaredMethod("receive", File.class, int.class);
             processMethod.setAccessible(true);
-            processMethod.invoke(handler, partition);
+            processMethod.invoke(handler, partition, 0);
 
         } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException exception) {
             System.err.println(exception.getMessage());
         }
+    }
+
+    @AfterAll
+    public static void cleanUp() {
+        CacheManager.setBroker(null);
+        CacheManager.removeStatus("topic:1");
     }
 }

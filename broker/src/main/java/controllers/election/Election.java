@@ -48,6 +48,8 @@ public class Election {
             //Getting brokers with higher priority than the current one
             List<Broker> highPriorityBrokers = CacheManager.getBrokers(key, BrokerConstants.PRIORITY_CHOICE.HIGH);
 
+            boolean electItself = false;
+
             if (highPriorityBrokers != null && highPriorityBrokers.size() > 0) {
                 //Sending "Election" message to those brokers
                 logger.info(String.format("[%s:%d] Sending \"Election\" message to %d high priority brokers.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), highPriorityBrokers.size()));
@@ -78,11 +80,18 @@ public class Election {
                         }
                     };
                     timer.schedule(task, BrokerConstants.ELECTION_RESPONSE_WAIT_TIME);
+                } else {
+                    logger.info(String.format("[%s:%d] Not \"Election\" response from any of the brokers. Electing itself as leader.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort()));
+                    electItself = true;
                 }
             } else {
+                electItself = true;
+
                 //No brokers with high priority found
                 logger.info(String.format("[%s:%d] No high priority brokers found. Electing itself as leader and sending leader update to low priority brokers.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort()));
+            }
 
+            if (electItself) {
                 //Elect itself as leader
                 CacheManager.setLeader(key, new Broker(CacheManager.getBrokerInfo()));
 

@@ -7,6 +7,7 @@ import controllers.RequestHandler;
 import models.Header;
 import models.Host;
 import models.Topic;
+import models.requests.CreateTopicRequest;
 import models.requests.Request;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -48,28 +49,6 @@ public class RequestHandlerTest {
             createTopic_isNack(topic);
         } finally {
             CacheManager.removeTopic(topic);
-        }
-    }
-
-    /**
-     * Test whether createTopic() create new topic if not exists
-     */
-    @Test
-    public void createTopic_newTopic_shouldCreateTopic() {
-        Host sampleBroker = new Host("address", 1234);
-        Topic topic = new Topic("Sample", 3);
-
-        try {
-            CacheManager.addBroker(sampleBroker);
-            Connection connection = new Connection();
-            mockConnection(connection);
-
-            sendRequest(connection, topic);
-
-            Assertions.assertTrue(CacheManager.isTopicExist("Sample"));
-        } finally {
-            CacheManager.removeTopic(topic);
-            CacheManager.removeBroker(sampleBroker);
         }
     }
 
@@ -134,11 +113,12 @@ public class RequestHandlerTest {
      */
     private void sendRequest(Connection connection, Topic topic) {
         RequestHandler requestHandler = new RequestHandler(connection);
+        CreateTopicRequest createTopicRequest = new CreateTopicRequest(topic.getName(), topic.getNumOfPartitions(), 2);
 
         try {
-            Method processMethod = RequestHandler.class.getDeclaredMethod("createTopic", Topic.class);
+            Method processMethod = RequestHandler.class.getDeclaredMethod("createTopic", CreateTopicRequest.class);
             processMethod.setAccessible(true);
-            processMethod.invoke(requestHandler, topic);
+            processMethod.invoke(requestHandler, createTopicRequest);
 
         } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException exception) {
             System.err.println(exception.getMessage());
@@ -170,9 +150,9 @@ public class RequestHandlerTest {
         RequestHandler requestHandler = new RequestHandler(connection);
 
         try {
-            Method processMethod = RequestHandler.class.getDeclaredMethod("processBrokerRequest", byte[].class, int.class);
+            Method processMethod = RequestHandler.class.getDeclaredMethod("processBrokerRequest", byte[].class, String.class);
             processMethod.setAccessible(true);
-            processMethod.invoke(requestHandler, packet);
+            processMethod.invoke(requestHandler, packet, Constants.TYPE.REQ.name());
 
         } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException exception) {
             System.err.println(exception.getMessage());

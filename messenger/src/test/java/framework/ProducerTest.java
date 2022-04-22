@@ -66,9 +66,9 @@ public class ProducerTest {
         //Creating separate thread which will listen for data and add to the queue
         Thread thread = new Thread(() -> {
             try {
-                Method processMethod = Producer.class.getDeclaredMethod("send");
+                Method processMethod = Producer.class.getDeclaredMethod("send", String.class, int.class);
                 processMethod.setAccessible(true);
-                processMethod.invoke(producer);
+                processMethod.invoke(producer, "topic", 0);
 
             } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException exception) {
                 System.err.println(exception.getMessage());
@@ -92,7 +92,7 @@ public class ProducerTest {
             e.printStackTrace();
         }
 
-        byte[] expected = Arrays.copyOfRange(byteArrayOutputStream.toByteArray(), 4, byteArrayOutputStream.size());
+        byte[] expected = Arrays.copyOfRange(byteArrayOutputStream.toByteArray(), 12, byteArrayOutputStream.size());
         Assertions.assertEquals(new String(data), new String(expected));
     }
 

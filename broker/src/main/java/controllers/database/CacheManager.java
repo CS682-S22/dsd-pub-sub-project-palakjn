@@ -115,6 +115,13 @@ public class CacheManager {
     }
 
     /**
+     * Remove status of the broker
+     */
+    public static synchronized void removeStatus(String key) {
+        brokerStatus.remove(key);
+    }
+
+    /**
      * Add the topic to the collection
      */
     public static void addTopic(String topic) {
@@ -157,7 +164,16 @@ public class CacheManager {
 
         partitions.put(key, file);
 
-        File partition = getPartition(key);
+        topicLock.writeLock().unlock();
+    }
+
+    /**
+     * Remove the partition
+     */
+    public static void removePartition(String key) {
+        topicLock.writeLock().lock();
+
+        partitions.remove(key);
 
         topicLock.writeLock().unlock();
     }
@@ -260,6 +276,17 @@ public class CacheManager {
         if (leader != null) {
             leaders.put(key, leader);
         }
+
+        leadersLock.writeLock().unlock();
+    }
+
+    /**
+     * Remove the leader for the given partition key
+     */
+    public static void removeLeader(String key) {
+        leadersLock.writeLock().lock();
+
+        leaders.remove(key);
 
         leadersLock.writeLock().unlock();
     }

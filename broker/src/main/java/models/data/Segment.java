@@ -1,6 +1,5 @@
 package models.data;
 
-import controllers.database.CacheManager;
 import controllers.database.FileManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
