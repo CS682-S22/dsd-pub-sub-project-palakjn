@@ -4,7 +4,7 @@
         <RollingFile name="appAppender" fileName="logs/app.log"
                      filePattern="logs/app-%d{MM-dd-yyyy}-%i.log.gz">
             <PatternLayout>
-                <Pattern>%d %p %c{1.} [%t] %m%n</Pattern>
+                <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} %class{0}.%method:%L - %msg%n</pattern>
             </PatternLayout>
             <Policies>
                 <TimeBasedTriggeringPolicy />
@@ -15,7 +15,7 @@
         <RollingFile name="producerAppender" fileName="logs/producer.log"
                      filePattern="logs/producer-%d{MM-dd-yyyy}-%i.log.gz">
             <PatternLayout>
-                <Pattern>%d %p %c{1.} [%t] %m%n</Pattern>
+                <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} %class{0}.%method:%L - %msg%n</pattern>
             </PatternLayout>
             <Policies>
                 <TimeBasedTriggeringPolicy />
@@ -26,7 +26,7 @@
         <RollingFile name="consumerAppender" fileName="logs/consumer.log"
                      filePattern="logs/consumer-%d{MM-dd-yyyy}-%i.log.gz">
             <PatternLayout>
-                <Pattern>%d %p %c{1.} [%t] %m%n</Pattern>
+                <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} %class{0}.%method:%L - %msg%n</pattern>
             </PatternLayout>
             <Policies>
                 <TimeBasedTriggeringPolicy />

@@ -64,6 +64,6 @@ public class HeartBeatReceivedTime {
      * Checks whether we have retried MAX and haven't received heartbeat message
      */
     public boolean isMaxRetry() {
-        return retries == BrokerConstants.HEARTBEAT_MAX_RETRY;
+        return retries == BrokerConstants.HEARTBEAT_MAX_RETRY - 1;
     }
 }

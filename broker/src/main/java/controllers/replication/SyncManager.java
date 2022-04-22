@@ -6,9 +6,7 @@ import controllers.Broker;
 import controllers.Brokers;
 import controllers.HostService;
 import controllers.database.CacheManager;
-import models.Host;
 import models.data.File;
-import models.requests.Request;
 import models.responses.Response;
 import models.sync.OffsetResponse;
 import org.apache.logging.log4j.LogManager;
@@ -36,20 +34,25 @@ public class SyncManager {
      * Sync the data with other brokers
      */
     public void sync(String key) {
-        //Set the status of the broker as sync
-        CacheManager.setStatus(key, BrokerConstants.BROKER_STATE.SYNC);
+        BrokerConstants.BROKER_STATE broker_state = CacheManager.getStatus(key);
 
-        //Get whether the broker is leader of the given partition key
-        boolean isLeader = CacheManager.isLeader(key, CacheManager.getBrokerInfo());
+        if (broker_state != BrokerConstants.BROKER_STATE.SYNC) {
+            logger.info(String.format("[%s] Starting sync process for the partition %s", CacheManager.getBrokerInfo().getString(), key));
+            //Set the status of the broker as sync
+            CacheManager.setStatus(key, BrokerConstants.BROKER_STATE.SYNC);
 
-        if (isLeader) {
-            //If leader then, send the request to followers to ask for the "offset"
-            logger.info(String.format("[%s] [Leader] Starting sync data with other followers for the partition key %s", CacheManager.getBrokerInfo().getString(), key));
-            syncLeader(key);
-        } else {
-            //If follower then, send the request to leader to ask for the "offset"
-            logger.info(String.format("[%s] [Follower] Starting sync data with leader for the partition key %s", CacheManager.getBrokerInfo().getString(), key));
-            syncFollower(key);
+            //Get whether the broker is leader of the given partition key
+            boolean isLeader = CacheManager.isLeader(key, CacheManager.getBrokerInfo());
+
+            if (isLeader) {
+                //If leader then, send the request to followers to ask for the "offset"
+                logger.info(String.format("[%s] [Leader] Starting sync data with other followers for the partition key %s", CacheManager.getBrokerInfo().getString(), key));
+                syncLeader(key);
+            } else {
+                //If follower then, send the request to leader to ask for the "offset"
+                logger.info(String.format("[%s] [Follower] Starting sync data with leader for the partition key %s", CacheManager.getBrokerInfo().getString(), key));
+                syncFollower(key);
+            }
         }
     }
 
@@ -104,8 +107,7 @@ public class SyncManager {
         for (OffsetResponse response : offsetResponseList) {
             if (response.getOffset() > offsetResponse.getOffset()) {
                 //Keeping the information that broker is out of sync, leader will update those brokers after getting up-to-date data
-                response.getBrokerInfo().setOutOfSync(true);
-                response.getBrokerInfo().setNextOffsetToRead(response.getSize());
+                CacheManager.setBrokerAsOutOfSync(response.getKey(), response.getBrokerInfo(), response.getSize());
 
                 offsetResponse = response;
             }
@@ -155,7 +157,7 @@ public class SyncManager {
             if (offsetResponse.getOffset() > partition.getOffset()) {
                 //If received offset is more than the have offset for the partition then, sending request to Broker to send the data
                 logger.info(String.format("[%s] Broker lag behind the broker %s for the key %s. Have Offset: %d. Expected Offset %d.", CacheManager.getBrokerInfo().getString(), offsetResponse.getBrokerInfo().getString(), offsetResponse.getKey(), partition.getOffset(), offsetResponse.getOffset()));
-                byte[] dataRequest = BrokerPacketHandler.createGetDataRequest(offsetResponse.getKey(), partition.getTotalSize(), offsetResponse.getOffset());
+                byte[] dataRequest = BrokerPacketHandler.createGetDataRequest(offsetResponse.getKey(), CacheManager.getBrokerInfo().getString(), partition.getTotalSize(), offsetResponse.getOffset());
 
                 //Sending the data request to the broker
                 offsetResponse.getBrokerInfo().send(dataRequest, BrokerConstants.CHANNEL_TYPE.DATA, BrokerConstants.ACK_WAIT_TIME, true);

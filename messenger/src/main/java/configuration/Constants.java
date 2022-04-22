@@ -17,7 +17,7 @@ public class Constants {
     public static int CONSUMER_MAX_PULL_SIZE = 500;
     public static int PRODUCER_WAIT_TIME = 3000;
     public static int GET_BROKER_WAIT_TIME = 5000;
-    public static int PRODUCER_SLEEP_TIME = 5000;
+    public static int PRODUCER_SLEEP_TIME = 20000;
     public static int ACK_WAIT_TIME = 10000;
     public static int MAX_HEARTBEAT_TASKS =  100;
 

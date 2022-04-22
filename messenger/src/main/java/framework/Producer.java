@@ -31,7 +31,7 @@ public class Producer extends Client {
      */
     public void send(String topic, int key, byte[] data) {
         if (!isConnected) {
-            if (getBrokerAndConnect(topic, key)) {
+            if (getBrokerAndConnect(topic, key, 0)) {
                 isConnected = true;
 
                 threadPool.execute(() -> send(topic, key));
@@ -61,6 +61,9 @@ public class Producer extends Client {
                 byte[] data = queue.poll(Constants.PRODUCER_WAIT_TIME, TimeUnit.MILLISECONDS);
 
                 if (data != null) {
+
+                    //TODO: Remove
+                    logger.info("Creating data packet with sequence number " + seqNum);
                     byte[] dataPacket = PacketHandler.createDataPacket(Constants.REQUESTER.PRODUCER, data, seqNum);
 
                     while (running && connection.isOpen()) {
@@ -90,7 +93,7 @@ public class Producer extends Client {
                             }
                         } else {
                             //Timeout. Retry
-                            logger.warn(String.format("[%s:%d] [%s] Timeout. Received no response from the broker. Retrying", broker.getAddress(), broker.getPort(), hostName));
+                            logger.warn(String.format("[%s:%d] [%s] Timeout. Received no response for the data packet with seqNum as %d from the broker. Retrying", broker.getAddress(), broker.getPort(), hostName, seqNum));
                             retry = true;
                         }
 
@@ -98,14 +101,19 @@ public class Producer extends Client {
                             connection.resetTimer();
 
                             Host oldBroker = new Host(broker);
-                            if (getBrokerAndConnect(topic, key)) {
-                                if (!oldBroker.equals(broker)) {
-                                    logger.info(String.format("[%s] Received new leader information from broker. Reset sequence number to 0", hostName));
-                                    seqNum = 0;
-                                }
-                            } else {
-                                logger.warn(String.format("[%s] Fail to get broker info from load balancer or during connection establishment with broker. Not retrying", hostName));
-                                running = false;
+                            broker = null;
+
+                            logger.info(String.format("[%s] Retrying by sharing offset as %d with the broker.", hostName, seqNum));
+
+                            while (!getBrokerAndConnect(topic, key, seqNum)) {
+                                logger.warn(String.format("[%s] Fail to connect with the broker %s. Might be failed. Sleeping for %d amount of time before retrying", hostName, oldBroker.getString(), Constants.PRODUCER_SLEEP_TIME));
+                                Thread.sleep(Constants.PRODUCER_SLEEP_TIME);
+
+                                broker = null;
+                            }
+
+                            if (!oldBroker.isSame(broker)) {
+                                logger.info(String.format("[%s] Received new leader information from broker.", hostName));
                             }
                         }
                     }
@@ -119,9 +127,9 @@ public class Producer extends Client {
     /**
      * Get broker information from load balancer and connect to it.
      */
-    private boolean getBrokerAndConnect(String topic, int key) {
+    private boolean getBrokerAndConnect(String topic, int key, int offset) {
         byte[] lbPacket = PacketHandler.createGetBrokerReq(Constants.REQUESTER.PRODUCER, topic, key);
-        byte[] brokerRequest = PacketHandler.createToBrokerRequest(Constants.REQUESTER.PRODUCER, Constants.TYPE.REQ, topic, key);
+        byte[] brokerRequest = PacketHandler.createToBrokerRequestWithSeqNum(Constants.REQUESTER.PRODUCER, Constants.TYPE.REQ, topic, key, offset);
 
         return (broker != null ||
                 getBroker(lbPacket, topic, key)) && connectToBroker(brokerRequest);

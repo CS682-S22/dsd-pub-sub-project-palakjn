@@ -26,7 +26,7 @@ public class DataPacket extends Object {
         this.toOffset = toOffset;
     }
 
-    public DataPacket(String key, String dataType, byte[] data) {
+    public DataPacket(String key,  String dataType, byte[] data) {
         this.key = key;
         this.dataType = dataType;
         this.data = data;

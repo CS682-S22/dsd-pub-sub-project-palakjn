@@ -36,7 +36,6 @@ public class HostService {
             }
         } catch (IOException exception) {
             logger.error(String.format("[%s:%d] Fail to make connection with the host.", address, port), exception.getMessage());
-            exception.printStackTrace();
         }
 
         return connection;

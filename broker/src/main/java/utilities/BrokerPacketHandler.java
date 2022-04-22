@@ -112,10 +112,11 @@ public class BrokerPacketHandler extends PacketHandler {
     /**
      * Create the request to get the data from the broker from the given fromOffset
      */
-    public static byte[] createGetDataRequest(String key, int fromOffset, int toOffset) {
+    public static byte[] createGetDataRequest(String key, String receiver, int fromOffset, int toOffset) {
         String parts[] = key.split(":");
         TopicReadWriteRequest topicReadWriteRequest = new TopicReadWriteRequest(parts[0], Integer.parseInt(parts[1]), fromOffset);
         topicReadWriteRequest.setToOffset(toOffset);
+        topicReadWriteRequest.setReceiver(receiver);
         Request<TopicReadWriteRequest> request = new Request<>(BrokerConstants.REQUEST_TYPE.GET, topicReadWriteRequest);
 
         return createPacket(BrokerConstants.REQUESTER.BROKER, BrokerConstants.TYPE.PULL, request);

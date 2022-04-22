@@ -87,8 +87,8 @@ public class BrokerHandler {
                     CacheManager.setLeader(brokerUpdateRequest.getRequest().getKey(), new Broker(brokerUpdateRequest.getRequest().getBroker()));
                     hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER);
 
-                    logger.info(String.format("[%s] The membership table for the partition of the topic %s after new leader is %s.", CacheManager.getBrokerInfo(), brokerUpdateRequest.getRequest().getKey(), CacheManager.getMemberShipTable(brokerUpdateRequest.getRequest().getKey())));
-                    System.out.printf("[%s] The membership table for the partition of the topic %s after new leader is %s.%n", CacheManager.getBrokerInfo(), brokerUpdateRequest.getRequest().getKey(), CacheManager.getMemberShipTable(brokerUpdateRequest.getRequest().getKey()));
+                    logger.info(String.format("[%s] The membership table for the partition of the topic %s after new leader is %s.", CacheManager.getBrokerInfo().getString(), brokerUpdateRequest.getRequest().getKey(), CacheManager.getMemberShipTable(brokerUpdateRequest.getRequest().getKey())));
+                    System.out.printf("[%s] The membership table for the partition of the topic %s after new leader is %s.%n", CacheManager.getBrokerInfo().getString(), brokerUpdateRequest.getRequest().getKey(), CacheManager.getMemberShipTable(brokerUpdateRequest.getRequest().getKey()));
 
                     syncManager.sync(brokerUpdateRequest.getRequest().getKey());
                 } else {
@@ -117,7 +117,7 @@ public class BrokerHandler {
                     if (partition != null) {
                         byte[] response = BrokerPacketHandler.createOffsetResponse(offsetRequest.getKey(), partition.getOffset(), partition.getTotalSize());
                         connection.send(response);
-                        logger.info(String.format("[%s] Send offset %s for the partition %s.", CacheManager.getBrokerInfo().getString(), partition.getOffset(), offsetRequest.getKey()));
+                        logger.info(String.format("[%s] Send offset %d and total size as %d for the partition %s.", CacheManager.getBrokerInfo().getString(), partition.getOffset(), partition.getTotalSize(), offsetRequest.getKey()));
                     } else {
                         logger.info(String.format("[%s] Not able to send an offset response as broker not holding the partition %s.", CacheManager.getBrokerInfo().getString(), offsetRequest.getKey()));
                         hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER);
@@ -147,8 +147,15 @@ public class BrokerHandler {
             if (request != null && request.getRequest() != null && request.getRequest().isValid()) {
                 TopicReadWriteRequest topicReadWriteRequest = request.getRequest();
                 logger.info(String.format("[%s] Received PULL request to send data to broker for partition %s from offset %s to offset %s", CacheManager.getBrokerInfo().getString(), topicReadWriteRequest.getName(), topicReadWriteRequest.getFromOffset(), topicReadWriteRequest.getToOffset()));
-                dataTransfer.setMethod(BrokerConstants.METHOD.SYNC);
-                dataTransfer.processRequest(topicReadWriteRequest);
+                if (CacheManager.isExist(topicReadWriteRequest.getName(), topicReadWriteRequest.getPartition())) {
+                    hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER);
+                    dataTransfer.setMethod(BrokerConstants.METHOD.SYNC);
+                    dataTransfer.setReceiver(request.getRequest().getReceiver());
+                    dataTransfer.processRequest(topicReadWriteRequest);
+                } else {
+                    logger.warn(String.format("[%s] Broker don't handle the topic %s-%d. Sending NACK for the PULL request from the broker", CacheManager.getBrokerInfo().getString(), topicReadWriteRequest.getName(), topicReadWriteRequest.getPartition()));
+                    hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER);
+                }
             } else {
                 logger.info(String.format("[%s] Received invalid PULL request", CacheManager.getBrokerInfo().getString()));
             }
@@ -187,6 +194,8 @@ public class BrokerHandler {
                             logger.info(String.format("[%s] Received all the data from the snapshot taken with the leader. Flush the local buffer to the segment. Changing broker status to READY", CacheManager.getBrokerInfo().getString()));
                             CacheManager.setStatus(dataPacket.getKey(), BrokerConstants.BROKER_STATE.READY);
                         }
+
+                        CacheManager.updatePartition(dataPacket.getKey(), partition);
                     } else {
                         logger.info(String.format("[%s] Unable to write the received data. Sending NACK", CacheManager.getBrokerInfo().getString()));
                         hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER);

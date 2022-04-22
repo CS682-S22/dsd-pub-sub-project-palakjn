@@ -129,7 +129,7 @@ public class File {
 
         BrokerConstants.BROKER_STATE broker_state = CacheManager.getStatus(dataPacket.getKey());
 
-        if (broker_state == BrokerConstants.BROKER_STATE.READY) {
+        if (broker_state == BrokerConstants.BROKER_STATE.READY || broker_state == BrokerConstants.BROKER_STATE.ELECTION) {
             if (Objects.equals(dataPacket.getDataType(), BrokerConstants.DATA_TYPE.REPLICA_DATA)) {
                 logger.info(String.format("[%s:%d] Writing REPLICA data to segment for key %s", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), name));
                 System.out.printf("[%s:%d] Writing REPLICA data to segment for key %s%n", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), name);
@@ -211,6 +211,8 @@ public class File {
         lock.readLock().lock();
         int segmentNumber = -1;
 
+        //TODO: remove
+        logger.debug(String.format("[%s] Offset is %d and available size is %d. Current segment size is %d. IsSync: %b", CacheManager.getBrokerInfo().getString(), offset, availableSize, segment.getAvailableSize(), isSync));
         if (offset < availableSize) {
             for (Segment seg : segments) {
                 if (offset < seg.getAvailableSize() && seg.isOffsetExist(offset)) {
@@ -218,10 +220,11 @@ public class File {
                     break;
                 }
             }
-        } else if (isSync && offset < segment.getAvailableSize() && segment.isOffsetExist(segmentNumber)) {
+        } else if (isSync && offset < segment.getAvailableSize() && segment.isOffsetExist(offset)) {
             segmentNumber = segment.getSegment();
         }
 
+        logger.debug(String.format("[%s] Segment %d holding offset %d", CacheManager.getBrokerInfo().getString(), segmentNumber, offset));
         lock.readLock().unlock();
         return segmentNumber;
     }
@@ -260,10 +263,10 @@ public class File {
         lock.readLock().lock();
 
         if (to < this.segments.size()) {
-            for (int i = from; i < to; i++) {
+            for (int i = from; i <= to; i++) {
                 segments.add(this.segments.get(i));
             }
-        } else if (to == this.segments.size()){
+        } else if (to == this.segments.size()) {
             for (int i = from; i < this.segments.size(); i++) {
                 segments.add(this.segments.get(i));
             }

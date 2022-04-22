@@ -19,6 +19,8 @@ public class TopicReadWriteRequest {
     private int numOfMsg;
     @Expose
     private int toOffset;
+    @Expose
+    private String receiver;
 
     public TopicReadWriteRequest(String name, int partition, int offset, int numOfMsg) {
         this.name = name;
@@ -87,5 +89,18 @@ public class TopicReadWriteRequest {
      */
     public void setToOffset(int lastOffset) {
         this.toOffset = lastOffset;
+    }
+
+    /**
+     * Get the receiver broker of the topic
+     */
+    public String getReceiver() {
+        return receiver;
+    }
+    /**
+     * Set the broker who is going to receive the topic
+     */
+    public void setReceiver(String receiver) {
+        this.receiver = receiver;
     }
 }

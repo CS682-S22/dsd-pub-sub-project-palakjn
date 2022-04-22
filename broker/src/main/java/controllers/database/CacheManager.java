@@ -150,6 +150,22 @@ public class CacheManager {
     }
 
     /**
+     * Update partition in a map
+     */
+    public static void updatePartition(String key, File file) {
+        topicLock.writeLock().lock();
+
+        partitions.put(key, file);
+
+        File partition = getPartition(key);
+
+        //TODO: Remove
+        logger.info("Updated partition with the offset as " + partition.getOffset() + " and total size as " + partition.getTotalSize());
+
+        topicLock.writeLock().unlock();
+    }
+
+    /**
      * Checks if the broker handling the given partition of the topic
      */
     public static boolean isExist(String topic, int partition) {
@@ -288,7 +304,15 @@ public class CacheManager {
         Broker leader = leaders.getOrDefault(key, null);
 
         if (leader != null) {
-            isEqual = leader.equals(host);
+            isEqual = leader.isSame(host);
+
+            if (!isEqual) {
+                //TODO: Remove
+                logger.info("[" + broker.getString() + "] Broker " + host.getString() + " is not the leader of topic " + key + " Leader is: " + leader.getString());
+            }
+        } else {
+            //TODO: Remove
+            logger.info("[" + broker.getString() + "] No leader info found");
         }
 
         leadersLock.readLock().unlock();
@@ -317,9 +341,11 @@ public class CacheManager {
     public static void addBroker(String key, Broker broker) {
         brokerLock.writeLock().lock();
 
-        Brokers brokerColl = brokers.getOrDefault(key, new Brokers());
-        brokerColl.add(broker);
-        brokers.put(key, brokerColl);
+        if (!isExist(key, broker)) {
+            Brokers brokerColl = brokers.getOrDefault(key, new Brokers());
+            brokerColl.add(broker);
+            brokers.put(key, brokerColl);
+        }
 
         brokerLock.writeLock().unlock();
     }
@@ -352,13 +378,28 @@ public class CacheManager {
     }
 
     /**
+     * Set the given broker as outdated for the given key
+     */
+    public static void setBrokerAsOutOfSync(String key, Broker broker, int nextOffset) {
+        brokerLock.writeLock().lock();
+
+        Brokers brokers = getBrokers(key);
+        if (brokers != null) {
+            brokers.setAsOutdated(broker, nextOffset);
+        }
+
+        brokerLock.writeLock().unlock();
+    }
+
+    /**
      * Update local membership table according to the received brokers from load balancer.
      */
     public static void updateMembershipTable(String key, Brokers receivedBrokers, List<Host> heartbeat) {
         brokerLock.writeLock().lock();
 
         //Iterating through received brokers to check if broker exist
-        for (Host broker : receivedBrokers.getBrokers()) {
+        List<Broker> brokerList = receivedBrokers.getBrokers();
+        for (Host broker : brokerList) {
             if(!isExist(key, broker)) {
                 logger.info(String.format("[%s] Received new follower %s information from load balancer to handle partition %s.", CacheManager.getBrokerInfo().getString(), broker.getString(), key));
                 addBroker(key, new Broker(broker));
@@ -369,10 +410,12 @@ public class CacheManager {
         //Iterating through have brokers to check which one is missing in received brokers
         Brokers collection = brokers.getOrDefault(key, null);
         if (collection != null) {
-            for (Broker broker : collection.getBrokers()) {
+            brokerList = collection.getBrokers();
+
+            for (Broker broker : brokerList) {
                 if (!receivedBrokers.contains(broker)) {
                     logger.info(String.format("[%s] Missing broker %s information in the latest membership table received from load balancer to handle partition %s.", CacheManager.getBrokerInfo().getString(), broker.getString(), key));
-                    removeBroker(key, broker);
+                    collection.remove(broker);
                 }
             }
         }
@@ -384,7 +427,7 @@ public class CacheManager {
      * Get the membership table of the partition in string format
      */
     public static String getMemberShipTable(String key) {
-        topicLock.readLock().lock();
+        brokerLock.readLock().lock();
         StringBuilder stringBuilder = new StringBuilder();
         Host leader = getLeader(key);
 
@@ -394,33 +437,41 @@ public class CacheManager {
             Brokers collection = getBrokers(key);
 
             if (collection != null) {
-                for (Host broker : collection.getBrokers()) {
+                List<Broker> brokerList = collection.getBrokers();
+
+                for (Host broker : brokerList) {
                     stringBuilder.append(String.format(", Broker: %s", broker.getString()));
                 }
             }
         }
 
-        topicLock.readLock().unlock();
+        brokerLock.readLock().unlock();
         return stringBuilder.toString();
     }
 
     /**
-     * Change the status of the broker to wait for follower
+     * Removing broker from the partition and change the status of the broker to wait for follower
      */
-    public static boolean changeStatusToWaitForFollower(String key, String serverId) {
-        boolean isSet = false;
+    public static Broker markDownBroker(String key, String serverId) {
+        Broker broker;
         brokerLock.writeLock().lock();
 
-        Broker broker = CacheManager.getBroker(key, serverId);
+        broker = CacheManager.getBroker(key, serverId);
         if (broker != null) {
+            if(CacheManager.isLeader(key, broker)) {
+                CacheManager.setLeaderAsInActive(key);
+                broker.setDesignation(BrokerConstants.BROKER_DESIGNATION.LEADER.getValue());
+            } else {
+                broker.setDesignation(BrokerConstants.BROKER_DESIGNATION.FOLLOWER.getValue());
+            }
+
             removeBroker(key, broker);
             setStatus(key, BrokerConstants.BROKER_STATE.WAIT_FOR_NEW_FOLLOWER);
             logger.info(String.format("[%s] Changing the status of broker to WAIT FOR NEW FOLLOWER when %s broker failed for the partition %s.", CacheManager.getBrokerInfo().getString(), serverId, key));
-            isSet = true;
         }
 
         brokerLock.writeLock().unlock();
-        return isSet;
+        return broker;
     }
 
     /**
@@ -462,7 +513,7 @@ public class CacheManager {
         brokerLock.readLock().lock();
 
         Brokers brokers = getBrokers(key);
-        exist = brokers.contains(broker);
+        exist = brokers != null && brokers.contains(broker);
 
         brokerLock.readLock().unlock();
         return exist;

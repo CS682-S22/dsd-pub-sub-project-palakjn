@@ -173,7 +173,7 @@ public class Host extends Object {
     /**
      * Check whether caller and given host is equal
      */
-    public boolean equals(Host host) {
+    public boolean isSame(Host host) {
         return address.equals(host.getAddress()) && port == host.getPort();
     }
 }

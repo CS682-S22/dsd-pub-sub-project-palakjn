@@ -56,23 +56,12 @@ public class FailureDetector {
     public void markDown(String key, String serverId) {
         logger.info(String.format("[%s] Marking %s broker down for the partition %s.", CacheManager.getBrokerInfo().getString(), serverId, key));
 
-        if (CacheManager.changeStatusToWaitForFollower(key, serverId)) {
-            Broker broker = CacheManager.getBroker(key, serverId);
-
-            if (broker != null) {
-                //Checking if the current broker is leader of the topic partition
-                if(CacheManager.isLeader(key, broker)) {
-                    CacheManager.setLeaderAsInActive(key);
-                    broker.setDesignation(BrokerConstants.BROKER_DESIGNATION.LEADER.getValue());
-                } else {
-                    broker.setDesignation(BrokerConstants.BROKER_DESIGNATION.FOLLOWER.getValue());
-                }
-
-                //Letting load balancer know about it
-                byte[] packet = BrokerPacketHandler.createFailBrokerPacket(key, broker);
-                sendLeaderUpdate(packet);
-                logger.info(String.format("[%s] Send broker failure notification to load balancer.", CacheManager.getBrokerInfo().getString()));
-            }
+        Broker broker = CacheManager.markDownBroker(key, serverId);
+        if (broker != null) {
+            //Letting load balancer know about it
+            byte[] packet = BrokerPacketHandler.createFailBrokerPacket(key, broker);
+            sendFailBrokerUpdate(packet);
+            logger.info(String.format("[%s] Send broker failure notification to load balancer.", CacheManager.getBrokerInfo().getString()));
         }
 
         Timer timer = timerTaskMap.getOrDefault(getTaskName(key, serverId), null);
@@ -89,13 +78,13 @@ public class FailureDetector {
     /**
      * Send new leader information to load balancer
      */
-    public void sendLeaderUpdate(byte[] packet) {
+    public void sendFailBrokerUpdate(byte[] packet) {
         //Get the connection with load balancer
         Connection connection = connectToLoadBalancer();
 
         if (connection != null) {
             //Send leader info and wait for an ack
-            hostService.sendPacketWithACK(connection, packet, BrokerConstants.ACK_WAIT_TIME, true);
+            connection.send(packet);
         }
     }
 
@@ -140,6 +129,7 @@ public class FailureDetector {
      */
     private void heartBeatCheck(String key, String serverId) {
         long now = System.currentTimeMillis();
+        boolean startTimer = false;
 
         HeartBeatReceivedTime receivedTime = CacheManager.getHeartBeatReceivedTime(key, serverId);
 
@@ -147,9 +137,19 @@ public class FailureDetector {
         long timeSinceLastHeartBeat = now - lastHeartBeatReceivedTime;
 
         if (timeSinceLastHeartBeat >= BrokerConstants.HEARTBEAT_TIMEOUT_THRESHOLD) {
-            logger.warn(String.format("[%s] Marking broker %s failed as the time since last heart beat %d exceed %d threshold.", CacheManager.getBrokerInfo().getString(), receivedTime.getServerId(), timeSinceLastHeartBeat, BrokerConstants.HEARTBEAT_TIMEOUT_THRESHOLD));
-            markDown(receivedTime.getKey(), receivedTime.getServerId());
+            if (receivedTime.isMaxRetry()) {
+                logger.warn(String.format("[%s] Marking broker %s failed as the time since last heart beat %d exceed %d threshold.", CacheManager.getBrokerInfo().getString(), receivedTime.getServerId(), timeSinceLastHeartBeat, BrokerConstants.HEARTBEAT_TIMEOUT_THRESHOLD));
+                markDown(receivedTime.getKey(), receivedTime.getServerId());
+            } else {
+                receivedTime.incrementRetry();
+                startTimer = true;
+            }
         } else {
+            receivedTime.resetRetryCount();
+            startTimer = true;
+        }
+
+        if (startTimer) {
             Timer timer = timerTaskMap.getOrDefault(getTaskName(key, serverId), null);
 
             if (timer != null) {
@@ -165,6 +165,6 @@ public class FailureDetector {
      * Get the task name
      */
     private String getTaskName(String key, String serverId) {
-        return String.format("HeartBeat_%s_%s", key, serverId);
+        return String.format("HeartBeatCheck_%s_%s", key, serverId);
     }
 }

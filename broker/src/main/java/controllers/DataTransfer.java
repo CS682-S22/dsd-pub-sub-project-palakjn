@@ -1,6 +1,5 @@
 package controllers;
 
-import configuration.Constants;
 import configurations.BrokerConstants;
 import controllers.consumer.Subscriber;
 import controllers.database.CacheManager;
@@ -21,6 +20,7 @@ public class DataTransfer {
     private BrokerConstants.METHOD method;
     private Subscriber subscriber;
     private HostService hostService;
+    private String receiver;
 
     public DataTransfer(Connection connection) {
         this.connection = connection;
@@ -36,10 +36,16 @@ public class DataTransfer {
 
     /**
      * Set the subscriber to whom to transfer the data if the method is PUSH
-     * @param subscriber
      */
     public void setSubscriber(Subscriber subscriber) {
         this.subscriber = subscriber;
+    }
+
+    /**
+     * Set the broker info which is going to receive the data
+     */
+    public void setReceiver(String receiver) {
+        this.receiver = receiver;
     }
 
     /**
@@ -56,7 +62,7 @@ public class DataTransfer {
         }
 
         if (fromSegmentNumber != -1 && toSegmentNumber != -1) {
-            logger.debug(String.format("[%s:%d] [%s] Segment %d holding information of %d offset", connection.getDestinationIPAddress(), connection.getDestinationPort(), method.name(), fromSegmentNumber, request.getFromOffset()));
+            logger.debug(String.format("[%s] [%s] Sending data from segment %d to segment %d and from the offset %d", CacheManager.getBrokerInfo().getString(), method.name(), fromSegmentNumber, toSegmentNumber, request.getFromOffset()));
             sendPartition(request, partition, fromSegmentNumber, toSegmentNumber);
         } else {
             hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER);
@@ -97,6 +103,10 @@ public class DataTransfer {
     private void sendPartition(TopicReadWriteRequest request, File partition, int fromSegmentNumber, int toSegmentNumber) {
         List<Segment> segments = partition.getSegmentsFrom(fromSegmentNumber, toSegmentNumber);
         int count = 0;
+        int offset;
+
+        //TODO: Remove
+        logger.debug(String.format("[%s] Sending data from %d segments.", CacheManager.getBrokerInfo().getString(), segments.size()));
 
         for (Segment segment : segments) {
             int offsetIndex = 0;
@@ -110,10 +120,16 @@ public class DataTransfer {
 
                 if (method == BrokerConstants.METHOD.SYNC && segment.getSegment() == toSegmentNumber && offsetIndex > segment.getOffsetIndex(request.getToOffset())) {
                     //Have to send only within the range during sync process
+                    //TODO: REMOVE
+                    logger.debug(String.format("[%s] Not sending offset %d as offsetIndex %d exceed toOffset %d when the segment number is %d", CacheManager.getBrokerInfo().getString(), segment.getOffset(offsetIndex), offsetIndex, segment.getOffsetIndex(request.getToOffset()), toSegmentNumber));
                     break;
                 }
 
-                sendSegment(segment, offsetIndex, !segment.isFlushed(), partition.getName(), request.getToOffset());
+                //TODO: Remove
+                logger.debug(String.format("[%s] Sending data with offset %d from segment %d.", CacheManager.getBrokerInfo().getString(), segment.getOffset(offsetIndex), segment.getSegment()));
+
+                offset = segment.getOffset(offsetIndex) - segment.getOffset(0);
+                sendSegment(segment, offsetIndex, offset, !segment.isFlushed(), partition.getName(), request.getToOffset());
                 count++;
                 offsetIndex++;
             }
@@ -123,7 +139,7 @@ public class DataTransfer {
     /**
      * Reads one log from segment file and send to the consumer
      */
-    private void sendSegment(Segment segment, int offsetIndex, boolean readBuffer, String key, int toOffset) {
+    private void sendSegment(Segment segment, int offsetIndex, int offset, boolean readBuffer, String key, int toOffset) {
         int length;
         int nextOffset;
 
@@ -142,7 +158,8 @@ public class DataTransfer {
             data = new byte[length];
 
             try (FileInputStream stream = new FileInputStream(segment.getLocation())) {
-                int result = stream.read(data, offsetIndex, length);
+                stream.getChannel().position(offset);
+                int result = stream.read(data);
                 if(result != length) {
                     logger.warn(String.format("[%s] Not able to send data. Read %d number of bytes. Expected %d number of bytes.", method.name(), result, length));
                     data = null;
@@ -155,7 +172,7 @@ public class DataTransfer {
 
         if (data != null) {
             send(key, data, nextOffset, toOffset);
-            logger.info(String.format("[%s:%d] [%s] Send %d number of bytes to the consumer %s:%d", connection.getSourceIPAddress(), connection.getSourcePort(), method.name(), data.length, connection.getDestinationIPAddress(), connection.getDestinationPort()));
+            logger.info(String.format("[%s] [%s] Send %d number of bytes to the consumer/broker %s:%d", CacheManager.getBrokerInfo().getString(), method.name(), data.length, connection.getDestinationIPAddress(), connection.getDestinationPort()));
         }
     }
 
@@ -169,7 +186,12 @@ public class DataTransfer {
             subscriber.onEvent(data);
         } else if (method == BrokerConstants.METHOD.SYNC) {
             byte[] dataPacket = BrokerPacketHandler.createDataPacket(key, BrokerConstants.DATA_TYPE.CATCH_UP_DATA, data, toOffset);
-            hostService.sendPacketWithACK(connection, dataPacket, BrokerConstants.ACK_WAIT_TIME);
+
+            Broker broker = CacheManager.getBroker(key, receiver);
+            if (broker != null) {
+                logger.info(String.format("[%s] Sending %d bytes of data to the receiver %s", CacheManager.getBrokerInfo().getString(), data.length, broker.getString()));
+                broker.send(dataPacket, BrokerConstants.CHANNEL_TYPE.DATA, BrokerConstants.ACK_WAIT_TIME, true);
+            }
         }
     }
 }

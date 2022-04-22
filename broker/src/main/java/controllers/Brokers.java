@@ -77,7 +77,7 @@ public class Brokers {
         lock.readLock().lock();
 
         for (Broker bro : brokers) {
-            if (bro.equals(host)) {
+            if (bro.isSame(host)) {
                 broker = new Broker(bro);
             }
         }
@@ -93,14 +93,14 @@ public class Brokers {
      */
     public boolean send(byte[] data, BrokerConstants.CHANNEL_TYPE channel_type, int waitTime, boolean retry) {
         boolean isSuccess = true;
-        lock.readLock().lock();
+        lock.writeLock().lock();
 
         //Sending the data to all the other brokers. Even when one of the broker failed.
         for (Broker broker : brokers) {
             isSuccess = broker.send(data, channel_type, waitTime, retry) && isSuccess;
         }
 
-        lock.readLock().unlock();
+        lock.writeLock().unlock();
         return isSuccess;
     }
 
@@ -139,13 +139,28 @@ public class Brokers {
      * Get the list of brokers
      */
     public List<Broker> getBrokers() {
+        List<Broker> copyBrokers;
         lock.readLock().lock();
 
-        try {
-            return brokers;
-        } finally {
-            lock.readLock().unlock();
+        copyBrokers = new ArrayList<>(brokers);
+
+        lock.readLock().unlock();
+        return copyBrokers;
+    }
+
+    /**
+     * Setting the given broker as outdated
+     */
+    public void setAsOutdated(Broker host, int nextOffset) {
+        lock.writeLock().lock();
+
+        Broker broker = getBroker(host);
+        if (broker != null) {
+            broker.setOutOfSync(true);
+            broker.setNextOffsetToRead(nextOffset);
         }
+
+        lock.writeLock().unlock();
     }
 
     /**

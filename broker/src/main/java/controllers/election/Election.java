@@ -39,55 +39,61 @@ public class Election {
      * Start the election process for the given key when the given leader is failed
      */
     public void start(String key, Host failedBroker) {
-        //Change the broker state to "Election"
-        CacheManager.setStatus(key, BrokerConstants.BROKER_STATE.ELECTION);
+        BrokerConstants.BROKER_STATE broker_state = CacheManager.getStatus(key);
 
-        //Getting brokers with higher priority than the current one
-        List<Broker> highPriorityBrokers = CacheManager.getBrokers(key, BrokerConstants.PRIORITY_CHOICE.HIGH);
+        if (broker_state != BrokerConstants.BROKER_STATE.ELECTION) {
+            //Change the broker state to "Election"
+            CacheManager.setStatus(key, BrokerConstants.BROKER_STATE.ELECTION);
 
-        if (highPriorityBrokers != null && highPriorityBrokers.size() > 0) {
-            //Sending "Election" message to those brokers
-            logger.info(String.format("[%s:%d] Sending \"Election\" message to %d high priority brokers.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), highPriorityBrokers.size()));
-            byte[] electionPacket = BrokerPacketHandler.createElectionPacket(key, failedBroker);
+            //Getting brokers with higher priority than the current one
+            List<Broker> highPriorityBrokers = CacheManager.getBrokers(key, BrokerConstants.PRIORITY_CHOICE.HIGH);
 
-            boolean isSuccess = false;
+            if (highPriorityBrokers != null && highPriorityBrokers.size() > 0) {
+                //Sending "Election" message to those brokers
+                logger.info(String.format("[%s:%d] Sending \"Election\" message to %d high priority brokers.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), highPriorityBrokers.size()));
+                byte[] electionPacket = BrokerPacketHandler.createElectionPacket(key, failedBroker);
 
-            for (Broker highPriorityBroker : highPriorityBrokers) {
-                isSuccess = highPriorityBroker.send(electionPacket, BrokerConstants.CHANNEL_TYPE.HEARTBEAT, BrokerConstants.ELECTION_RESPONSE_WAIT_TIME, false) || isSuccess;
+                boolean isSuccess = false;
+
+                for (Broker highPriorityBroker : highPriorityBrokers) {
+                    isSuccess = highPriorityBroker.send(electionPacket, BrokerConstants.CHANNEL_TYPE.HEARTBEAT, BrokerConstants.ELECTION_RESPONSE_WAIT_TIME, false) || isSuccess;
+
+                    if (isSuccess) {
+                        logger.info(String.format("[%s:%d] Send \"Election\" message to broker %s:%d.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), highPriorityBroker.getAddress(), highPriorityBroker.getPort()));
+                    } else {
+                        logger.warn(String.format("[%s:%d] Received no response from the broker %s:%d for \"Election\" message. Marking down the broker.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), highPriorityBroker.getAddress(), highPriorityBroker.getPort()));
+                        failureDetector.markDown(key, highPriorityBroker.getString());
+                    }
+                }
 
                 if (isSuccess) {
-                    logger.info(String.format("[%s:%d] Send \"Election\" message to broker %s:%d.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), highPriorityBroker.getAddress(), highPriorityBroker.getPort()));
-                } else {
-                    logger.warn(String.format("[%s:%d] Received no response from the broker %s:%d for \"Election\" message. Marking down the broker.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort(), highPriorityBroker.getAddress(), highPriorityBroker.getPort()));
-                    failureDetector.markDown(key, highPriorityBroker.getString());
+                    logger.info(String.format("[%s:%d] Received \"Election\" response from all other brokers. Waiting for leader update.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort()));
+                    timer = new Timer();
+                    TimerTask task = new TimerTask() {
+                        @Override
+                        public void run() {
+                            checkForLeaderUpdate(key, failedBroker);
+                            timer.cancel();
+                            this.cancel();
+                        }
+                    };
+                    timer.schedule(task, BrokerConstants.ELECTION_RESPONSE_WAIT_TIME);
                 }
-            }
+            } else {
+                //No brokers with high priority found
+                logger.info(String.format("[%s:%d] No high priority brokers found. Electing itself as leader and sending leader update to low priority brokers.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort()));
 
-            if (isSuccess) {
-                logger.info(String.format("[%s:%d] Received \"Election\" response from all other brokers. Waiting for leader update.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort()));
-                timer = new Timer();
-                TimerTask task = new TimerTask() {
-                    @Override
-                    public void run() {
-                        checkForLeaderUpdate(key, failedBroker);
-                        timer.cancel();
-                        this.cancel();
-                    }
-                };
-                timer.schedule(task, BrokerConstants.ELECTION_RESPONSE_WAIT_TIME);
+                //Elect itself as leader
+                CacheManager.setLeader(key, new Broker(CacheManager.getBrokerInfo()));
+
+                //Sending "I am leader" message to other brokers and load balancer
+                sendLeaderUpdate(key);
+
+                //Set the broker instance to "Sync"
+                syncManager.sync(key);
             }
         } else {
-            //No brokers with high priority found
-            logger.info(String.format("[%s:%d] No high priority brokers found. Electing itself as leader and sending leader update to low priority brokers.", CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort()));
-
-            //Elect itself as leader
-            CacheManager.setLeader(key, new Broker(CacheManager.getBrokerInfo()));
-
-            //Sending "I am leader" message to other brokers and load balancer
-            sendLeaderUpdate(key);
-
-            //Set the broker instance to "Sync"
-//            syncManager.sync(key);
+            logger.info(String.format("[%s] Election is in already progress for partition %s.", CacheManager.getBrokerInfo().getString(), key));
         }
     }
 

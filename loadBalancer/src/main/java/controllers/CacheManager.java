@@ -239,46 +239,39 @@ public class CacheManager {
      * Get new follower which will handle the partition of the topic
      */
     public static Topic updateMDAfterFailure(BrokerUpdateRequest request) {
-        Host newFollower;
+        Topic topic = null;
         topicLock.writeLock().lock();
 
         Partition partition = getPartition(request.getTopic(), request.getPartition());
         Host broker = getBroker(request.getBroker().getAddress(), request.getBroker().getPort());
 
-        if (request.getBroker().isLeader()) {
-            logger.debug("Leader is failed");
-            partition.removeLeader();
+        if (broker.isActive()) {
+            if (request.getBroker().isLeader()) {
+                logger.debug("Leader is failed");
+                partition.removeLeader();
+            } else {
+                logger.debug("Follower is failed");
+                partition.removeFollower(broker);
+            }
+
+            broker.decrementNumOfPartitions();
+            broker.setInActive();
+
+            Host newFollower = findNewFollower(partition);
+            if (newFollower != null) {
+                logger.info(String.format("Broker %s:%d will handled topic %s:%d.", newFollower.getAddress(), newFollower.getPort(), partition.getTopicName(), partition.getNumber()));
+                partition.addBroker(newFollower);
+            } else {
+                logger.warn(String.format("No new follower found for handling topic %s:%d", partition.getTopicName(), partition.getNumber()));
+            }
+
+            topic = new Topic(partition.getTopicName(), partition);
         } else {
-            logger.debug("Follower is failed");
-            partition.removeFollower(broker);
+            logger.info(String.format("[%s] Request for updating broker %s failure is being already processed.", broker.getString(), request.getBroker().getString()));
         }
-
-        broker.decrementNumOfPartitions();
-        broker.setInActive();
-
-        newFollower = findNewFollower(partition);
-        logger.info(String.format("Broker %s:%d will handled topic %s:%d.", newFollower.getAddress(), newFollower.getPort(), partition.getTopicName(), partition.getNumber()));
-        partition.addBroker(newFollower);
 
         topicLock.writeLock().unlock();
-        return new Topic(partition.getTopicName(), partition);
-    }
-
-    /**
-     * Check if the received request to mark broker failure is already happen
-     */
-    public static boolean isFailureHandled(BrokerUpdateRequest request) {
-        boolean isHandled = false;
-        topicLock.readLock().lock();
-
-        Host broker = getBroker(request.getBroker().getAddress(), request.getBroker().getPort());
-
-        if (!broker.isActive()) {
-            isHandled = true;
-        }
-
-        topicLock.readLock().unlock();
-        return isHandled;
+        return topic;
     }
 
     /**

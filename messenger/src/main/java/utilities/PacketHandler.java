@@ -7,7 +7,11 @@ import models.Object;
 import models.requests.GetBrokerRequest;
 import models.requests.TopicReadWriteRequest;
 import models.requests.Request;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -18,6 +22,7 @@ import java.util.Arrays;
  * @author Palak Jain
  */
 public class PacketHandler {
+    private static final Logger logger = LogManager.getLogger(PacketHandler.class);
 
     /**
      * Create the header part of the packet
@@ -102,6 +107,22 @@ public class PacketHandler {
     }
 
     /**
+     * Create the entire packet: header + body
+     * @return byte array
+     */
+    public static byte[] createPacketWithOffset(Constants.REQUESTER requester, Constants.TYPE type, Object object, int offset) {
+        byte[] packet = null;
+        byte[] body = object.toByte();
+
+        if (body != null) {
+            byte[] header = createHeaderWithOffset(requester, type, offset);
+            packet = ByteBuffer.allocate(4 + header.length + body.length).putInt(header.length).put(header).put(body).array();
+        }
+
+        return packet;
+    }
+
+    /**
      * Create the entire packet with the seqNum: header + body
      * @return byte array
      */
@@ -145,8 +166,10 @@ public class PacketHandler {
     /**
      * Create request to the broker which is holding the topic-partition information
      */
-    public static byte[] createToBrokerRequest(Constants.REQUESTER requester, Constants.TYPE type, String topic, int partition) {
-        return createPacket(requester, type, topic, partition);
+    public static byte[] createToBrokerRequestWithSeqNum(Constants.REQUESTER requester, Constants.TYPE type, String topic, int partition, int seqNum) {
+        TopicReadWriteRequest writeTopicRequest = new TopicReadWriteRequest(topic, partition, 0, 0);
+
+        return createPacketWithOffset(requester, type, new Request<>(writeTopicRequest), seqNum);
     }
 
     /**
@@ -197,7 +220,11 @@ public class PacketHandler {
 
             header =  Header.Content.parseFrom(headerBytes);
         } catch (InvalidProtocolBufferException | BufferUnderflowException exception) {
-            System.err.printf("Unable to read the header part from the received message. Error: %s.\n", exception.getMessage());
+            StringWriter sw = new StringWriter();
+            PrintWriter pw = new PrintWriter(sw);
+            exception.printStackTrace(pw);
+
+            logger.error(String.format("Unable to read the header part from the received message. Error: %s.", pw.toString()));
         }
 
         return header;
@@ -214,7 +241,11 @@ public class PacketHandler {
         try {
             content = Arrays.copyOfRange(message, getOffset(message), message.length);
         } catch (IndexOutOfBoundsException exception ) {
-            System.err.printf("Unable to read the data from the received message. Error: %s.\n", exception.getMessage());
+            StringWriter sw = new StringWriter();
+            PrintWriter pw = new PrintWriter(sw);
+            exception.printStackTrace(pw);
+
+            logger.error(String.format("Unable to read the data from the received message. Error: %s.", pw.toString()));
         }
 
         return content;
@@ -232,7 +263,11 @@ public class PacketHandler {
             //4 + header length will give the position of the array where the next part of the message resides.
             position = 4 + ByteBuffer.wrap(message).getInt();
         } catch (BufferUnderflowException exception) {
-            System.err.printf("Unable to get the position to read next bytes after header from the received message. Error: %s.\n", exception.getMessage());
+            StringWriter sw = new StringWriter();
+            PrintWriter pw = new PrintWriter(sw);
+            exception.printStackTrace(pw);
+
+            logger.error(String.format("Unable to get the position to read next bytes after header from the received message. Error: %s.", pw.toString()));
         }
 
         return position;

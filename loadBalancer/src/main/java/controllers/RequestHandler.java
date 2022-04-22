@@ -113,11 +113,11 @@ public class RequestHandler {
                     if (brokerUpdateRequest != null && brokerUpdateRequest.isValid()) {
                         if (request.getType().equalsIgnoreCase(Constants.REQUEST_TYPE.FAIL)) {
                             logger.info(String.format("[%s:%d] Received request to indicate the failure of broker %s:%d handling topic %s:%d", connection.getDestinationIPAddress(), connection.getDestinationPort(), brokerUpdateRequest.getBroker().getAddress(), brokerUpdateRequest.getBroker().getPort(), brokerUpdateRequest.getTopic(), brokerUpdateRequest.getPartition()));
-                            if (CacheManager.isFailureHandled(brokerUpdateRequest)) {
-                                logger.info(String.format("[%s:%d] Request for updating broker %s failure is being already processed.", connection.getDestinationIPAddress(), connection.getDestinationPort(), brokerUpdateRequest.getBroker().getString()));
-                            } else {
-                                Topic topic = CacheManager.updateMDAfterFailure(brokerUpdateRequest);
-                                logger.info(String.format("[%s:%d] Marking broker %s inactive and finding new follower.", connection.getDestinationIPAddress(), connection.getDestinationPort(), brokerUpdateRequest.getBroker().getString()));
+
+                            logger.info(String.format("[%s:%d] Marking broker %s inactive and finding new follower.", connection.getDestinationIPAddress(), connection.getDestinationPort(), brokerUpdateRequest.getBroker().getString()));
+                            Topic topic = CacheManager.updateMDAfterFailure(brokerUpdateRequest);
+
+                            if (topic != null) {
                                 sendToBrokers(topic);
                             }
                         } else if (request.getType().equalsIgnoreCase(Constants.REQUEST_TYPE.LEADER)) {
@@ -251,15 +251,17 @@ public class RequestHandler {
     private void sendToBrokers(Topic topic) {
         HashMap<String, Topic> partitionsPerBroker = topic.groupBy();
 
-        //Create threads equal to the number of r.
-        ExecutorService threadPool = Executors.newFixedThreadPool(partitionsPerBroker.size());
+        if (!partitionsPerBroker.isEmpty()) {
+            //Create threads equal to the number of brokers.
+            ExecutorService threadPool = Executors.newFixedThreadPool(partitionsPerBroker.size());
 
-        for (Map.Entry<String, Topic> entry : partitionsPerBroker.entrySet()) {
-            //Per partition, assign a thread to send the partition information to the broker
-            threadPool.execute(() -> sendToBroker(entry.getKey(), entry.getValue()));
+            for (Map.Entry<String, Topic> entry : partitionsPerBroker.entrySet()) {
+                //Per partition, assign a thread to send the partition information to the broker
+                threadPool.execute(() -> sendToBroker(entry.getKey(), entry.getValue()));
+            }
+
+            threadPool.shutdown();
         }
-
-        threadPool.shutdown();
     }
 
     /**

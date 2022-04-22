@@ -1,6 +1,9 @@
 package models.data;
 
+import controllers.database.CacheManager;
 import controllers.database.FileManager;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -12,6 +15,7 @@ import java.util.List;
  * @author Palak Jain
  */
 public class Segment {
+    private static final Logger logger = LogManager.getLogger(Segment.class);
     private int segment;
     private byte[] buffer;
     private List<Integer> offsets;
@@ -68,6 +72,16 @@ public class Segment {
      * Checks if the given offset exists
      */
     public boolean isOffsetExist(int offset) {
+        //TODO: Remove
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append(String.format("[%s] The segment %d has offsets: ", CacheManager.getBrokerInfo().getString(), segment));
+
+        for (int off : offsets) {
+            stringBuilder.append(off).append(", ");
+        }
+
+        logger.debug(stringBuilder.toString());
+
         return offsets.contains(offset);
     }
 

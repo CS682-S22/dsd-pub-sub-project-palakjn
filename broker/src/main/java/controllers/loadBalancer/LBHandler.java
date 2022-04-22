@@ -131,8 +131,8 @@ public class LBHandler {
     public void sendLeaderUpdate(byte[] packet) {
         //Get the connection with load balancer
         if (connect()) {
-            //Send leader info and wait for an ack
-            hostService.sendPacketWithACK(connection, packet, BrokerConstants.ACK_WAIT_TIME, true);
+            //Send leader info
+            connection.send(packet);
         }
     }
 
@@ -164,7 +164,7 @@ public class LBHandler {
 
         for (Partition partition : topic.getPartitions()) {
             File file = new File(partition.getTopicName(), partition.getNumber());
-            if (file.initialize(String.format(BrokerConstants.TOPIC_LOCATION, connection.getSourceIPAddress(), connection.getSourcePort()), partition.getTopicName(), partition.getNumber())) {
+            if (file.initialize(String.format(BrokerConstants.TOPIC_LOCATION, CacheManager.getBrokerInfo().getAddress(), CacheManager.getBrokerInfo().getPort()), partition.getTopicName(), partition.getNumber())) {
                 CacheManager.addPartition(partition.getTopicName(), partition.getNumber(), file);
 
                 if (partition.getLeader() != null) {
@@ -182,18 +182,17 @@ public class LBHandler {
                     }
                 }
 
-                logger.info(String.format("[%s] The membership table for thr partition of the topic %s is %s.", CacheManager.getBrokerInfo(), partition.getString(), partition.getMemberShipTable()));
+                logger.info(String.format("[%s] The membership table for thr partition of the topic %s is %s.", CacheManager.getBrokerInfo().getString(), partition.getString(), partition.getMemberShipTable()));
 
                 if (CacheManager.isLeader(partition.getString(), CacheManager.getBrokerInfo())) {
                     //If the current broker is leader of the topic then, change the status to READY
                     logger.info(String.format("[%s] Broker is the leader of the partition %s.", CacheManager.getBrokerInfo().getString(), partition.getString()));
-                    CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.READY);
+                    syncManager.sync(partition.getString());
                 } else {
                     //If the current broker is follower of the topic then,
                     if (!partition.getLeader().isActive()) {
                         // If the leader for the given partition is not active then, start the election
                         logger.info(String.format("[%s] New follower. Leader is inactive. Starting election to elect new leader.", CacheManager.getBrokerInfo().getString()));
-                        CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.ELECTION);
                         election.start(partition.getString(), partition.getLeader());
                     } else {
                         // If the leader is active then, changing the status to SYNC mode and starting catching up with leader
@@ -229,7 +228,6 @@ public class LBHandler {
             if (!partition.getLeader().isActive()) {
                 // If the leader for the given partition is not active then, start the election
                 logger.info(String.format("[%s] Leader is failed for the partition %s. Starting election.", CacheManager.getBrokerInfo().getString(), partition.getString()));
-                CacheManager.setStatus(partition.getString(), BrokerConstants.BROKER_STATE.ELECTION);
                 election.start(partition.getString(), partition.getLeader());
             } else {
                 //If new follower is added, then keep the status of current broker for the partition as READY

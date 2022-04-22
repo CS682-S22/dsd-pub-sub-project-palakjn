@@ -48,14 +48,14 @@ public class ProducerHandler {
                 }
 
                 if (writeTopicRequest != null && writeTopicRequest.isValid()) {
-                    logger.info(String.format("[%s:%d] Received request to add the logs for the topic %s - partition %d from the producer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), writeTopicRequest.getName(), writeTopicRequest.getPartition(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
+                    logger.info(String.format("[%s:%d] Received request to add the logs for the topic %s - partition %d with offset %d from the producer %s:%d.", connection.getSourceIPAddress(), connection.getSourcePort(), writeTopicRequest.getName(), writeTopicRequest.getPartition(), header.getOffset(), connection.getDestinationIPAddress(), connection.getDestinationPort()));
 
                     //Checks if broker handling the topic-partition information or not
                     if (CacheManager.isExist(writeTopicRequest.getName(), writeTopicRequest.getPartition())) {
                         hostService.sendACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
 
                         File file = CacheManager.getPartition(writeTopicRequest.getName(), writeTopicRequest.getPartition());
-                        receive(file);
+                        receive(file, header.getOffset());
                     } else {
                         logger.warn(String.format("[%s:%d] Current broker %s:%d not holding any topic %s - partition %d. Sending NACK.", connection.getDestinationIPAddress(), connection.getDestinationPort(), connection.getSourceIPAddress(), connection.getSourcePort(), writeTopicRequest.getName(), writeTopicRequest.getPartition()));
                         hostService.sendNACK(connection, BrokerConstants.REQUESTER.BROKER, header.getSeqNum());
@@ -77,10 +77,9 @@ public class ProducerHandler {
     /**
      * Receives data from publisher, write to the local segment as well as send to all the subscribers.
      */
-    private void receive(File partition) {
+    private void receive(File partition, int seqNum) {
         boolean reading = true;
         //Sequence number of the expecting packet
-        int seqNum = 0;
 
         while (reading && connection.isOpen()) {
             byte[] message = connection.receive();

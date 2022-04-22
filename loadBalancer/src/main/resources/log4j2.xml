@@ -4,7 +4,7 @@
         <RollingFile name="lbAppender" fileName="logs/loadbalancer.log"
                      filePattern="logs/loadbalancer-%d{MM-dd-yyyy}-%i.log.gz">
             <PatternLayout>
-                <Pattern>%d %p %c{1.} [%t] %m%n</Pattern>
+                <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} %class{0}.%method:%L - %msg%n</pattern>
             </PatternLayout>
             <Policies>
                 <TimeBasedTriggeringPolicy />
